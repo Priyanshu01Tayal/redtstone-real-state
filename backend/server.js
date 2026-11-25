@@ -1,3 +1,4 @@
+
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -30,19 +31,36 @@ initSocket(server);
 
 // Security & Middlewares
 app.use(helmet({
-  crossOriginResourcePolicy: false, // Allow static images to be loaded by frontend
+  crossOriginResourcePolicy: false,
 }));
+
+// CORS Configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  ...(process.env.FRONTEND_URL || '')
+    .split(',')
+    .map(url => url.trim())
+    .filter(Boolean),
+];
+
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
+
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // Rate limiter for general APIs
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000, // Reasonable limit
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -53,7 +71,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check route
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Mount Routes
@@ -83,12 +104,16 @@ process.on('uncaughtException', (error) => {
 
 const startServer = async () => {
   await connectDB();
-  
+
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`\n❌ [PORT CONFLICT] Port ${PORT} is already in use by another process.`);
-      console.error(`👉 To release port ${PORT} on Windows (PowerShell), run:`);
-      console.error(`   Get-NetTCPConnection -LocalPort ${PORT} | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\n`);
+      console.error(
+        `\n❌ [PORT CONFLICT] Port ${PORT} is already in use by another process.`
+      );
+      console.error('👉 To release this port on Windows (PowerShell), run:');
+      console.error(
+        `Get-NetTCPConnection -LocalPort ${PORT} | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\n`
+      );
       process.exit(1);
     } else {
       console.error('[Server Error]:', err);
@@ -96,12 +121,12 @@ const startServer = async () => {
   });
 
   server.listen(PORT, () => {
-    console.log(`=======================================================`);
-    console.log(`  REDSTONE REAL ESTATE BROKERAGE SERVER STARTED`);
+    console.log('=======================================================');
+    console.log('  REDSTONE REAL ESTATE BROKERAGE SERVER STARTED');
     console.log(`  Port: ${PORT}`);
     console.log(`  Mode: ${process.env.NODE_ENV || 'development'}`);
     console.log(`  Health Check: http://localhost:${PORT}/api/health`);
-    console.log(`=======================================================`);
+    console.log('=======================================================');
   });
 };
 
