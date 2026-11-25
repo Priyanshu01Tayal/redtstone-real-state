@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,9 +26,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Don't auto-clear if already on login/public page
       if (window.location.pathname.startsWith('/admin') ||
-          window.location.pathname.startsWith('/broker') ||
-          window.location.pathname.startsWith('/owner') ||
-          window.location.pathname.startsWith('/client')) {
+        window.location.pathname.startsWith('/broker') ||
+        window.location.pathname.startsWith('/owner') ||
+        window.location.pathname.startsWith('/client')) {
         localStorage.removeItem('redstone_token');
         localStorage.removeItem('redstone_user');
         window.location.href = '/login?session_expired=1';
