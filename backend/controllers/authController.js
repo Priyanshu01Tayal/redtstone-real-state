@@ -15,10 +15,14 @@ exports.register = async (req, res, next) => {
     const { name, email, password, phone, role, licenseNumber, experienceYears, specialization } = req.body;
 
     // Disallow registering as admin directly from public form
-    let assignedRole = role || 'client';
-    if (assignedRole === 'admin') {
-      assignedRole = 'client';
+    if (role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin accounts cannot be registered publicly. They must be provisioned through authorized backend operations.',
+      });
     }
+
+    const assignedRole = role || 'client';
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {

@@ -17,7 +17,7 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
   }
 
   if (!isAuthenticated || !user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {

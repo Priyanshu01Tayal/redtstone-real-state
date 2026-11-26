@@ -18,16 +18,15 @@ import {
 import { useLanguage } from '../../context/LanguageContext';
 
 const Navbar = () => {
-  const { user, logout, demoLogin } = useAuth();
+  const { user, logout } = useAuth();
   const { lang, toggleLanguage, t } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [demoDropdownOpen, setDemoDropdownOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const getDashboardLink = () => {
-    if (!user) return '/login';
+    if (!user) return '/welcome';
     switch (user.role) {
       case 'admin':
         return '/admin/dashboard';
@@ -42,7 +41,7 @@ const Navbar = () => {
   };
 
   const navLinks = [
-    { name: t('home'), path: '/' },
+    { name: t('home'), path: user ? '/marketplace' : '/welcome' },
     { name: t('mapAndHeatmap'), path: '/map-search' },
     { name: t('buy'), path: '/buy' },
     { name: t('rent'), path: '/rent' },
@@ -52,26 +51,6 @@ const Navbar = () => {
     { name: t('contact'), path: '/contact' },
   ];
 
-  const handleDemoSelect = async (role) => {
-    setDemoDropdownOpen(false);
-    await demoLogin(role);
-    switch (role) {
-      case 'admin':
-        navigate('/admin/dashboard');
-        break;
-      case 'broker':
-        navigate('/broker/dashboard');
-        break;
-      case 'owner':
-        navigate('/owner/dashboard');
-        break;
-      case 'client':
-        navigate('/client/dashboard');
-        break;
-      default:
-        break;
-    }
-  };
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#EEEEEE] shadow-sm">
@@ -87,33 +66,19 @@ const Navbar = () => {
             <span>Zero Spam • Direct In-House Broker Representation</span>
           </div>
 
-          {/* Quick Demo Switcher */}
           <div className="flex items-center space-x-2">
-            <span className="text-gray-400 font-semibold text-[11px]">1-Click Demo Login:</span>
-            <button
-              onClick={() => handleDemoSelect('admin')}
-              className="bg-gray-800 hover:bg-[#C62828] text-white px-2 py-0.5 rounded text-[11px] font-medium transition"
-            >
-              Admin
-            </button>
-            <button
-              onClick={() => handleDemoSelect('broker')}
-              className="bg-gray-800 hover:bg-[#C62828] text-white px-2 py-0.5 rounded text-[11px] font-medium transition"
-            >
-              In-House Broker
-            </button>
-            <button
-              onClick={() => handleDemoSelect('owner')}
-              className="bg-gray-800 hover:bg-[#C62828] text-white px-2 py-0.5 rounded text-[11px] font-medium transition"
-            >
-              Property Owner
-            </button>
-            <button
-              onClick={() => handleDemoSelect('client')}
-              className="bg-gray-800 hover:bg-[#C62828] text-white px-2 py-0.5 rounded text-[11px] font-medium transition"
-            >
-              Client / Buyer
-            </button>
+            {!user ? (
+              <Link
+                to="/welcome"
+                className="bg-[#C62828] hover:bg-[#B71C1C] text-white px-3 py-0.5 rounded text-[11px] font-bold transition flex items-center gap-1 shadow-sm"
+              >
+                <span>🚪 Stakeholder Entry Portal</span>
+              </Link>
+            ) : (
+              <span className="text-gray-400 text-[11px]">
+                Signed in: <strong className="text-white uppercase">{user.role}</strong>
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -122,7 +87,7 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Brand Logo */}
-          <Link to="/" className="flex items-center space-x-2.5 group">
+          <Link to={user ? `/${user.role}/dashboard` : '/welcome'} className="flex items-center space-x-2.5 group">
             <div className="w-10 h-10 rounded-xl bg-[#C62828] flex items-center justify-center text-white shadow-md group-hover:bg-[#B71C1C] transition transform group-hover:scale-105">
               <Building2 className="w-6 h-6" />
             </div>

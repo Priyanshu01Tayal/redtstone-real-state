@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('redstone_user');
     setUser(null);
     setToken(null);
-    window.location.href = '/login';
+    window.location.href = '/welcome';
   };
 
   const updateProfile = async (data) => {

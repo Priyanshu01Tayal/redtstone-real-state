@@ -5,7 +5,7 @@ const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const { connectDB } = require('./config/db');
 const { initSocket } = require('./config/socket');

@@ -6,7 +6,9 @@ import { Building2, User, Mail, Phone, Lock, ArrowRight, ShieldCheck, Home, Comp
 const RegisterPage = () => {
   const { register } = useAuth();
   const [searchParams] = useSearchParams();
-  const initialRole = searchParams.get('role') || 'client';
+  const requestedRole = searchParams.get('role');
+  const isAdminRequested = requestedRole === 'admin';
+  const initialRole = isAdminRequested || !['client', 'owner', 'broker'].includes(requestedRole) ? 'client' : requestedRole;
 
   const [role, setRole] = useState(initialRole);
   const [name, setName] = useState('');
@@ -21,6 +23,10 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (role === 'admin') {
+      setError('Admin accounts cannot be registered publicly.');
+      return;
+    }
     setError('');
     setSubmitting(true);
 
@@ -48,7 +54,7 @@ const RegisterPage = () => {
       <div className="max-w-lg w-full space-y-6">
         {/* Brand Header */}
         <div className="text-center">
-          <Link to="/" className="inline-flex items-center space-x-2.5 mb-3">
+          <Link to="/welcome" className="inline-flex items-center space-x-2.5 mb-3">
             <div className="w-10 h-10 rounded-xl bg-[#C62828] flex items-center justify-center text-white shadow-md">
               <Building2 className="w-6 h-6" />
             </div>
@@ -59,6 +65,19 @@ const RegisterPage = () => {
           <h2 className="text-2xl font-black text-[#222222]">Create an Account</h2>
           <p className="text-xs text-gray-500 mt-1">Select your stakeholder profile to get started</p>
         </div>
+
+        {/* Admin Registration Warning */}
+        {isAdminRequested && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 space-y-1">
+            <p className="font-bold">⚠️ Admin Registration Disabled</p>
+            <p>
+              Administrative accounts cannot be registered publicly. If you are an authorized administrator, please{' '}
+              <Link to="/login?role=admin" className="font-black text-[#C62828] underline">
+                Sign In to Admin Portal
+              </Link>.
+            </p>
+          </div>
+        )}
 
         {/* Role Selector Tabs */}
         <div className="grid grid-cols-3 gap-2 bg-gray-100 p-1.5 rounded-2xl">

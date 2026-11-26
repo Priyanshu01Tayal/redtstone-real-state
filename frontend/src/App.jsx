@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { CompareProvider } from './context/CompareContext';
@@ -22,6 +22,8 @@ import AboutPage from './pages/public/AboutPage';
 import ContactPage from './pages/public/ContactPage';
 import LoginPage from './pages/public/LoginPage';
 import RegisterPage from './pages/public/RegisterPage';
+import WelcomePage from './pages/public/WelcomePage';
+import SplashScreen from './components/entry/SplashScreen';
 
 // Owner Pages
 import OwnerDashboard from './pages/owner/OwnerDashboard';
@@ -62,6 +64,48 @@ import AdminSettings from './pages/admin/AdminSettings';
 // Common
 import ProfilePage from './pages/common/ProfilePage';
 
+function RootEntryPoint() {
+  const { user, isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-[#181A1F] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[#C62828] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // If already authenticated: redirect to their correct dashboard
+  if (isAuthenticated && user) {
+    return <Navigate to={`/${user.role}/dashboard`} replace />;
+  }
+
+  // If unauthenticated: show full-screen animated RedStone logo splash (~2s), then navigate to /welcome
+  return (
+    <SplashScreen
+      standalone={true}
+      duration={2000}
+      onComplete={() => {
+        navigate('/welcome', { replace: true });
+      }}
+    />
+  );
+}
+
+function SplashRouteHandler() {
+  const navigate = useNavigate();
+  return (
+    <SplashScreen
+      standalone={true}
+      duration={2000}
+      onComplete={() => {
+        navigate('/welcome', { replace: true });
+      }}
+    />
+  );
+}
+
 function App() {
   return (
     <Router>
@@ -71,9 +115,14 @@ function App() {
             <CompareProvider>
               <ErrorBoundary>
                 <Routes>
-                {/* Public Website Routes */}
+                {/* Mandatory Authentication-First Entry Flow Routes */}
+                <Route path="/" element={<RootEntryPoint />} />
+                <Route path="/splash" element={<SplashRouteHandler />} />
+                <Route path="/welcome" element={<WelcomePage />} />
+
+                {/* Marketplace & Browsing (Authenticated) + Auth Pages */}
                 <Route element={<PublicLayout />}>
-                  <Route path="/" element={<HomePage />} />
+                  <Route path="/marketplace" element={<HomePage />} />
                   <Route path="/map-search" element={<MapSearchPage />} />
                   <Route path="/buy" element={<BuyPage />} />
                   <Route path="/rent" element={<RentPage />} />
