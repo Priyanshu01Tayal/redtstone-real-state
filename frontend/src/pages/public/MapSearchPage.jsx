@@ -157,21 +157,21 @@ const MapSearchPage = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Top Banner & Layer Switcher */}
-      <div className="bg-white p-5 rounded-2xl border border-[#EEEEEE] shadow-sm mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-3xl border border-[#EBEBEB] shadow-sm mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#FFCDD2] text-[#C62828] mb-1">
+          <span className="inline-block px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-[#C62828] mb-1">
             Geospatial Intelligence Engine
           </span>
           <h1 className="text-2xl font-black text-[#222222]">
             Interactive Map & Dual Heatmap Explorer
           </h1>
-          <p className="text-xs text-[#777777]">
+          <p className="text-xs text-[#717171]">
             Toggle between verified property pins, supply density, and anonymized buyer demand heatmaps.
           </p>
         </div>
 
         {/* Layer Mode Tabs */}
-        <div className="flex flex-wrap items-center gap-2 bg-[#F8F8F8] p-1.5 rounded-xl border border-[#EEEEEE]">
+        <div className="flex flex-wrap items-center gap-1.5 bg-[#F7F7F7] p-1.5 rounded-2xl border border-[#EBEBEB]">
           <button
             onClick={() => setActiveLayer('pins')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${

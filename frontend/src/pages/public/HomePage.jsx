@@ -2,1193 +2,555 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import PropertyCard from '../../components/common/PropertyCard';
-import VoiceSearchModal from '../../components/common/VoiceSearchModal';
-import PropertyMediaExperienceViewer from '../../components/media/PropertyMediaExperienceViewer';
+import CategoryBar from '../../components/common/CategoryBar';
+import FilterModal from '../../components/common/FilterModal';
+import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import {
   Search,
   MapPin,
+  Building2,
   Home,
-  Building,
-  Key,
   ShieldCheck,
-  CheckCircle,
-  Users,
-  Award,
-  ArrowRight,
-  PhoneCall,
-  Calendar,
   Sparkles,
+  SlidersHorizontal,
+  ArrowRight,
   TrendingUp,
-  Mic,
-  ChevronDown,
-  ChevronUp,
-  Check,
-  Send,
+  RotateCcw,
+  PlusCircle,
   Compass,
-  Star,
-  Clock,
-  Briefcase,
-  Play,
-  X,
-  Phone,
-  MessageCircle,
 } from 'lucide-react';
 
-// Popular Delhi NCR Micromarkets
+// Popular Delhi NCR Micromarkets with authentic coordinates & imagery
 const POPULAR_LOCALITIES = [
   {
     name: 'Crossing Republik',
     city: 'Ghaziabad',
-    subtitle: 'High-Rise Gated Societies & Lake View Condos',
-    image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80',
-    avgRate: '₹4,850 / sq.ft',
-    activeListings: '28+ Flats',
-    growth: '+12.4% YoY',
-    tags: ['NH-24 Expressway', 'Gaur City Border', 'Gated Security'],
+    subtitle: 'Gated Societies & High-Rises',
+    image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80',
+    query: 'Crossing Republik',
   },
   {
     name: 'Indirapuram',
     city: 'Ghaziabad',
-    subtitle: 'Prime Residential Core & Independent Floors',
-    image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-    avgRate: '₹7,200 / sq.ft',
-    activeListings: '42+ Flats',
-    growth: '+14.1% YoY',
-    tags: ['Ahinsa Khand', 'Swarn Jayanti Park', 'Near Metro'],
+    subtitle: 'Prime Residential & Builder Floors',
+    image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80',
+    query: 'Indirapuram',
   },
   {
     name: 'Sector 62',
     city: 'Noida',
-    subtitle: 'Corporate IT Hub & Institutional Corridor',
-    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80',
-    avgRate: '₹8,900 / sq.ft',
-    activeListings: '34+ Units',
-    growth: '+9.8% YoY',
-    tags: ['Grade-A IT Parks', 'Blue Line Metro', 'Commercial Hub'],
+    subtitle: 'IT Corridor & Metro Connectivity',
+    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80',
+    query: 'Sector 62',
   },
   {
     name: 'Golf Course Road',
     city: 'Gurgaon',
-    subtitle: 'Ultra-Luxury Penthouses & Golf Residences',
-    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
-    avgRate: '₹24,500 / sq.ft',
-    activeListings: '19+ Penthouses',
-    growth: '+18.6% YoY',
-    tags: ['DLF Horizon', 'Rapid Metro', 'Executive Living'],
+    subtitle: 'Ultra-Luxury Penthouses & Condos',
+    image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80',
+    query: 'Golf Course Road',
   },
   {
     name: 'Raj Nagar Extension',
     city: 'Ghaziabad',
-    subtitle: 'Affordable Gated Townships with Elevated Road',
-    image: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=80',
-    avgRate: '₹4,100 / sq.ft',
-    activeListings: '31+ Flats',
-    growth: '+11.2% YoY',
-    tags: ['Elevated Highway', 'BCCI Stadium', 'Green Belt'],
+    subtitle: 'Modern Affordable Townships',
+    image: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=600&q=80',
+    query: 'Raj Nagar Extension',
   },
   {
     name: 'Noida Expressway',
     city: 'Noida',
-    subtitle: 'Master-Planned Integrated High-Rise Townships',
-    image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80',
-    avgRate: '₹9,400 / sq.ft',
-    activeListings: '25+ Flats',
-    growth: '+15.2% YoY',
-    tags: ['Sector 137', 'Advant Navis', 'Expressway Direct'],
-  },
-];
-
-// Licensed In-House Broker Team
-const IN_HOUSE_BROKERS = [
-  {
-    name: 'Vikram Singhania',
-    role: 'Principal Luxury Consultant',
-    rera: 'RERA DL-REA-2021-9872',
-    experience: '9+ Years Experience',
-    specialization: 'Luxury High-Rise & Penthouses',
-    dealsClosed: '48 Verified Closures',
-    territory: 'Gurgaon • South Delhi',
-    rating: 4.95,
-    reviews: 64,
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=80',
-    phone: '+91 98110 00101',
-  },
-  {
-    name: 'Ananya Deshmukh',
-    role: 'Commercial Leasing & Retail Lead',
-    rera: 'RERA HR-REA-2022-4412',
-    experience: '7+ Years Experience',
-    specialization: 'Corporate IT Offices & High Street',
-    dealsClosed: '39 Commercial Leases',
-    territory: 'Sector 62 Noida • Cyber City',
-    rating: 4.92,
-    reviews: 52,
-    image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=500&q=80',
-    phone: '+91 98110 00102',
-  },
-  {
-    name: 'Rohit Talwar',
-    role: 'Residential Specialist & Area Manager',
-    rera: 'RERA UP-REA-2023-1092',
-    experience: '6+ Years Experience',
-    specialization: 'Gated Residential Flats & Builder Floors',
-    dealsClosed: '42 Residential Deals',
-    territory: 'Crossing Republik • Indirapuram',
-    rating: 4.88,
-    reviews: 51,
-    image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=500&q=80',
-    phone: '+91 98110 00103',
-  },
-  {
-    name: 'Neha Kashyap',
-    role: 'Family Homes & Rental Advisory',
-    rera: 'RERA UP-REA-2023-5581',
-    experience: '5+ Years Experience',
-    specialization: 'Furnished Family Flats & Rentals',
-    dealsClosed: '56 Rental Closures',
-    territory: 'Indirapuram • Raj Nagar Extension',
-    rating: 4.91,
-    reviews: 78,
-    image: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=500&q=80',
-    phone: '+91 98110 00104',
-  },
-];
-
-// Customer Testimonials
-const TESTIMONIALS = [
-  {
-    name: 'Dr. Alok Verma',
-    role: 'Property Owner (Crossing Republik)',
-    comment:
-      'I listed my 3BHK flat on Redstone. The best part is my personal phone number was never leaked! Broker Rohit handled all the calls and visits, and found a great tenant within 12 days.',
-    rating: 5,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-  },
-  {
-    name: 'Priya & Rahul Sharma',
-    role: 'Home Buyers (Indirapuram)',
-    comment:
-      'The 360° virtual tour gave us a crystal-clear look at the living room and kitchen before visiting. No fake photos or surprises. Broker Vikram helped us complete all paperwork seamlessly.',
-    rating: 5,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-  },
-  {
-    name: 'Rajesh Khanna',
-    role: 'Tenant (Sector 62, Noida)',
-    comment:
-      'Unlike local street brokers who demand 1 month rent for doing nothing, Redstone broker accompanied us to 3 flats, negotiated fair rent, and verified society NOC. Highly recommended!',
-    rating: 5,
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-  },
-];
-
-// FAQs
-const FAQ_ITEMS = [
-  {
-    q: 'How does Redstone protect property owners from spam calls?',
-    a: 'Unlike open classified websites, Redstone NEVER displays your mobile number, email, or apartment number online. Your listing is assigned to our licensed in-house broker. All buyer enquiries, screening, and visits are coordinated directly by your broker.',
-  },
-  {
-    q: 'What is the 360° Virtual Tour and how does it help?',
-    a: 'Every verified flat features a real 360° spherical room tour. You can rotate 360° inside the actual living room, master bedroom, and kitchen using your phone or mouse, saving you from wasting time visiting unsuitable properties in person.',
-  },
-  {
-    q: 'What are the brokerage commission charges?',
-    a: 'We follow standard transparent brokerage: 2% of transaction value for purchase/sale upon successful deal closure, or 1 month rent for rental agreements. No upfront listing fees, no marketing charges.',
-  },
-  {
-    q: 'How does the physical broker verification work?',
-    a: 'Before any flat is published, our licensed broker physically visits the property, verifies the owner deed, measures carpet area, and checks electrical and plumbing fittings.',
-  },
-  {
-    q: 'Can I schedule an in-person site visit for a flat?',
-    a: 'Yes! Simply click "Schedule Site Visit" on any property. Our in-house broker will confirm the time with the owner and meet you at the society entrance to accompany you.',
+    subtitle: 'Integrated High-Rise Living',
+    image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=600&q=80',
+    query: 'Noida Expressway',
   },
 ];
 
 const HomePage = () => {
-  const { lang, t } = useLanguage();
+  const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // State Management
+  const [properties, setProperties] = useState([]);
   const [featuredProperties, setFeaturedProperties] = useState([]);
-  const [allProperties, setAllProperties] = useState([]);
-  const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-  const [expandedFaq, setExpandedFaq] = useState(0);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
-  // Instant 360 Tour Modal State on Home Page
-  const [selected360Property, setSelected360Property] = useState(null);
-
-  // Search Form State
-  const [listingType, setListingType] = useState('sale'); // 'sale' | 'rent' | 'pg' | 'commercial'
+  // Filter States
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [searchLocation, setSearchLocation] = useState('');
-  const [propertyCategory, setPropertyCategory] = useState('');
-  const [budgetMax, setBudgetMax] = useState('');
-  const [bhkFilter, setBhkFilter] = useState('');
+  const [listingType, setListingType] = useState('all'); // 'all' | 'sale' | 'rent'
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [bedrooms, setBedrooms] = useState('');
+  const [bathrooms, setBathrooms] = useState('');
+  const [furnishing, setFurnishing] = useState('');
+  const [sort, setSort] = useState('latest');
 
-  // Quick Advisory Form
-  const [advisoryName, setAdvisoryName] = useState('');
-  const [advisoryPhone, setAdvisoryPhone] = useState('');
-  const [advisorySubmitted, setAdvisorySubmitted] = useState(false);
+  // Active filter count for badge
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (listingType !== 'all') count++;
+    if (minPrice) count++;
+    if (maxPrice) count++;
+    if (bedrooms) count++;
+    if (bathrooms) count++;
+    if (furnishing) count++;
+    if (sort !== 'latest') count++;
+    return count;
+  }, [listingType, minPrice, maxPrice, bedrooms, bathrooms, furnishing, sort]);
 
-  // Fetch Featured Properties
-  useEffect(() => {
-    const fetchHomeData = async () => {
-      try {
-        setLoading(true);
-        const [featuredRes, propsRes] = await Promise.all([
-          api.get('/properties/featured').catch(() => ({ data: { properties: [] } })),
-          api.get('/properties', { params: { limit: 12 } }).catch(() => ({ data: { properties: [] } })),
-        ]);
-
-        const featured = featuredRes.data?.properties || [];
-        const all = propsRes.data?.properties || [];
-        setFeaturedProperties(featured.length > 0 ? featured : all.slice(0, 6));
-        setAllProperties(all);
-      } catch (err) {
-        console.error('Failed to load homepage data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchHomeData();
-  }, []);
-
-  // Filtered Properties for Showcase Tab
-  const filteredProperties = useMemo(() => {
-    if (activeTab === 'all') return featuredProperties;
-    if (activeTab === 'sale') return allProperties.filter((p) => p.purpose === 'sale');
-    if (activeTab === 'rent') return allProperties.filter((p) => p.purpose === 'rent');
-    if (activeTab === 'commercial') return allProperties.filter((p) => p.category === 'commercial');
-    return featuredProperties;
-  }, [activeTab, featuredProperties, allProperties]);
-
-  // Handle Search Submission
-  const handleSearch = (e) => {
-    e.preventDefault();
-    const params = new URLSearchParams();
-
-    if (listingType === 'commercial') {
-      params.set('category', 'commercial');
-      if (searchLocation) params.set('search', searchLocation);
-      navigate(`/commercial?${params.toString()}`);
-      return;
-    }
-
-    const targetRoute = listingType === 'sale' ? '/buy' : '/rent';
-    params.set('listingType', listingType === 'pg' ? 'rent' : listingType);
-    if (listingType === 'pg') params.set('propertyType', 'room');
-    else if (propertyCategory) params.set('propertyType', propertyCategory);
-
-    if (searchLocation) params.set('search', searchLocation);
-    if (budgetMax) params.set('maxPrice', budgetMax);
-    if (bhkFilter) params.set('bhk', bhkFilter);
-
-    navigate(`${targetRoute}?${params.toString()}`);
-  };
-
-  // Handle Voice Search Parsed Result
-  const handleVoiceParsed = (parsed) => {
-    if (parsed.locality) setSearchLocation(parsed.locality);
-    if (parsed.purpose) setListingType(parsed.purpose);
-    if (parsed.propertyType) setPropertyCategory(parsed.propertyType);
-    if (parsed.bhk) setBhkFilter(parsed.bhk);
-
-    const params = new URLSearchParams();
-    const targetType = parsed.purpose || listingType;
-    params.set('listingType', targetType === 'pg' ? 'rent' : targetType);
-    if (parsed.locality) params.set('search', parsed.locality);
-    if (parsed.bhk) params.set('bhk', parsed.bhk);
-    if (parsed.propertyType) params.set('propertyType', parsed.propertyType);
-
-    navigate(`/${targetType === 'sale' ? 'buy' : 'rent'}?${params.toString()}`);
-  };
-
-  // Handle Quick Advisory
-  const handleAdvisorySubmit = async (e) => {
-    e.preventDefault();
-    if (!advisoryName || !advisoryPhone) return;
+  // Fetch properties from backend API
+  const fetchProperties = async () => {
     try {
-      await api.post('/enquiries', {
-        name: advisoryName,
-        phone: advisoryPhone,
-        message: 'Callback requested from homepage advisory form',
-        enquiryType: 'general_consultation',
-      });
-      setAdvisorySubmitted(true);
+      setLoading(true);
+      const params = {};
+      if (searchLocation) params.search = searchLocation;
+      if (listingType && listingType !== 'all') params.listingType = listingType;
+      if (selectedCategory) params.propertyType = selectedCategory;
+      if (minPrice) params.minPrice = minPrice;
+      if (maxPrice) params.maxPrice = maxPrice;
+      if (bedrooms) params.bedrooms = bedrooms;
+      if (furnishing) params.furnishing = furnishing;
+      if (sort) params.sort = sort;
+      params.limit = 24;
+
+      const [propsRes, featRes] = await Promise.all([
+        api.get('/properties', { params }),
+        api.get('/properties/featured').catch(() => ({ data: { properties: [] } })),
+      ]);
+
+      setProperties(propsRes.data?.properties || []);
+      setFeaturedProperties(featRes.data?.properties || []);
     } catch (err) {
-      setAdvisorySubmitted(true);
+      console.error('Failed to load properties:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const sampleFlatForHero = featuredProperties[0] || {
-    _id: 'default_hero_prop',
-    title: 'Panchsheel Wellington - 3BHK Park Facing Flat',
-    locality: 'Crossing Republik',
-    city: 'Ghaziabad',
-    price: 8800000,
-    bedrooms: 3,
-    bathrooms: 3,
-    area: 1750,
-    listingType: 'sale',
+  useEffect(() => {
+    fetchProperties();
+  }, [selectedCategory, listingType, sort]);
+
+  const handleSearchSubmit = (e) => {
+    e?.preventDefault();
+    fetchProperties();
+  };
+
+  const handleResetFilters = () => {
+    setSelectedCategory('');
+    setSearchLocation('');
+    setListingType('all');
+    setMinPrice('');
+    setMaxPrice('');
+    setBedrooms('');
+    setBathrooms('');
+    setFurnishing('');
+    setSort('latest');
+    setTimeout(() => {
+      fetchProperties();
+    }, 50);
+  };
+
+  const handleCategorySelect = (catId) => {
+    setSelectedCategory(catId);
+  };
+
+  const handleLocationClick = (locQuery) => {
+    setSearchLocation(locQuery);
+    setTimeout(() => {
+      fetchProperties();
+      window.scrollTo({ top: 380, behavior: 'smooth' });
+    }, 50);
+  };
+
+  // Filter dictionary for FilterModal
+  const filterObject = {
+    listingType: listingType === 'all' ? '' : listingType,
+    minPrice,
+    maxPrice,
+    bedrooms,
+    bathrooms,
+    furnishing,
+    sort,
+  };
+
+  const handleFilterChange = (key, value) => {
+    if (key === 'listingType') setListingType(value || 'all');
+    else if (key === 'minPrice') setMinPrice(value);
+    else if (key === 'maxPrice') setMaxPrice(value);
+    else if (key === 'bedrooms') setBedrooms(value);
+    else if (key === 'bathrooms') setBathrooms(value);
+    else if (key === 'furnishing') setFurnishing(value);
+    else if (key === 'sort') setSort(value);
   };
 
   return (
-    <div className="bg-[#F8F8F8] text-[#222222] min-h-screen">
-      {/* ======================================================== */}
-      {/* 1. HERO SECTION: BRIGHT, WARM, HUMAN-CRAFTED DESIGN       */}
-      {/* ======================================================== */}
-      <section className="relative bg-gradient-to-b from-[#FFF5F5] via-white to-[#F8F8F8] pt-8 pb-16 border-b border-[#EEEEEE]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            
-            {/* Left Content (7 Cols) */}
-            <div className="lg:col-span-7 space-y-5 text-left">
-              {/* Trust Badge */}
-              <div className="inline-flex items-center space-x-2 bg-red-50 px-3.5 py-1.5 rounded-full border border-red-200 text-xs font-bold text-[#C62828]">
-                <ShieldCheck className="w-4 h-4 text-[#C62828]" />
-                <span>RERA-Licensed In-House Brokerage</span>
-                <span className="text-gray-300">•</span>
-                <span className="text-[#222222]">100% Owner Privacy Guaranteed</span>
-              </div>
+    <div className="bg-[#FFFFFF] min-h-screen text-[#222222]">
+      {/* 1. Category Bar (Airbnb-Style Horizontally Scrollable) */}
+      <CategoryBar
+        selectedCategory={selectedCategory}
+        onSelectCategory={handleCategorySelect}
+        onOpenFilters={() => setIsFilterModalOpen(true)}
+        activeFilterCount={activeFilterCount}
+      />
 
-              {/* Display Headline */}
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[1.2] text-[#222222]">
-                Find Your Dream Flat in Delhi NCR —{' '}
-                <span className="text-[#C62828]">
-                  Verified on Site.
-                </span>
-              </h1>
-
-              <p className="text-base sm:text-lg text-[#555555] font-normal leading-relaxed max-w-2xl">
-                Skip random agent spam and fake listings. Explore real flats with interactive 360° virtual tours and connect directly with our assigned in-house broker.
-              </p>
-
-              {/* 3 Key Trust Checkmarks */}
-              <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-[#444444] pt-1">
-                <div className="flex items-center space-x-1.5">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  <span>Zero Spam Calls to Owners</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  <span>Physical 6-Point On-Site Check</span>
-                </div>
-                <div className="flex items-center space-x-1.5">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" />
-                  <span>Real 360° Room Tours</span>
-                </div>
-              </div>
-
-              {/* ===================================================== */}
-              {/* CLEAN SEARCH CONSOLE (LIKE MAGICBRICKS / NOBROKER)    */}
-              {/* ===================================================== */}
-              <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 border border-[#EEEEEE] mt-4">
-                
-                {/* 4 Tabs: Buy Flat | Rent Flat | Commercial | Plots */}
-                <div className="flex items-center space-x-2 border-b border-[#EEEEEE] pb-3 mb-4 overflow-x-auto text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setListingType('sale')}
-                    className={`px-4 py-2 rounded-xl font-bold transition flex items-center space-x-1.5 shrink-0 ${
-                      listingType === 'sale'
-                        ? 'bg-[#C62828] text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <Key className="w-3.5 h-3.5" />
-                    <span>Buy Flat</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setListingType('rent')}
-                    className={`px-4 py-2 rounded-xl font-bold transition flex items-center space-x-1.5 shrink-0 ${
-                      listingType === 'rent'
-                        ? 'bg-[#C62828] text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <Building className="w-3.5 h-3.5" />
-                    <span>Rent Flat</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setListingType('commercial')}
-                    className={`px-4 py-2 rounded-xl font-bold transition flex items-center space-x-1.5 shrink-0 ${
-                      listingType === 'commercial'
-                        ? 'bg-[#222222] text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <Briefcase className="w-3.5 h-3.5" />
-                    <span>Commercial</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setListingType('pg')}
-                    className={`px-4 py-2 rounded-xl font-bold transition flex items-center space-x-1.5 shrink-0 ${
-                      listingType === 'pg'
-                        ? 'bg-[#C62828] text-white shadow-sm'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <Home className="w-3.5 h-3.5" />
-                    <span>PG / Co-Living</span>
-                  </button>
-                </div>
-
-                {/* Form Inputs */}
-                <form onSubmit={handleSearch} className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    
-                    {/* Locality Input */}
-                    <div className="bg-[#F8F8F8] p-3 rounded-2xl border border-gray-200 focus-within:border-[#C62828] transition">
-                      <label className="block text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                        Locality / Society
-                      </label>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <MapPin className="w-4 h-4 text-[#C62828] shrink-0" />
-                        <input
-                          type="text"
-                          placeholder="Crossing Republik, Indirapuram"
-                          value={searchLocation}
-                          onChange={(e) => setSearchLocation(e.target.value)}
-                          className="w-full bg-transparent text-xs font-bold text-[#222222] focus:outline-none placeholder-gray-400"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Property Category */}
-                    <div className="bg-[#F8F8F8] p-3 rounded-2xl border border-gray-200 focus-within:border-[#C62828] transition">
-                      <label className="block text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                        Property Type
-                      </label>
-                      <select
-                        value={propertyCategory}
-                        onChange={(e) => setPropertyCategory(e.target.value)}
-                        className="w-full bg-transparent text-xs font-bold text-[#222222] focus:outline-none mt-1 cursor-pointer"
-                      >
-                        <option value="">All Categories</option>
-                        <option value="apartment">Apartment / High-Rise</option>
-                        <option value="independent_house">Independent Builder Floor</option>
-                        <option value="villa">Luxury Villa</option>
-                        <option value="residential_plot">Residential Plot</option>
-                        <option value="office">Commercial Office</option>
-                      </select>
-                    </div>
-
-                    {/* Budget Max */}
-                    <div className="bg-[#F8F8F8] p-3 rounded-2xl border border-gray-200 focus-within:border-[#C62828] transition">
-                      <label className="block text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                        Max Budget
-                      </label>
-                      <select
-                        value={budgetMax}
-                        onChange={(e) => setBudgetMax(e.target.value)}
-                        className="w-full bg-transparent text-xs font-bold text-[#222222] focus:outline-none mt-1 cursor-pointer"
-                      >
-                        <option value="">Any Budget</option>
-                        {listingType === 'rent' ? (
-                          <>
-                            <option value="15000">Up to ₹15,000 / mo</option>
-                            <option value="25000">Up to ₹25,000 / mo</option>
-                            <option value="40000">Up to ₹40,000 / mo</option>
-                            <option value="75000">Up to ₹75,000 / mo</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="5000000">Up to ₹50 Lakh</option>
-                            <option value="10000000">Up to ₹1 Crore</option>
-                            <option value="20000000">Up to ₹2 Crore</option>
-                            <option value="50000000">Up to ₹5 Crore</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-
-                    {/* BHK Selector */}
-                    <div className="bg-[#F8F8F8] p-3 rounded-2xl border border-gray-200 focus-within:border-[#C62828] transition">
-                      <label className="block text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                        Bedrooms
-                      </label>
-                      <select
-                        value={bhkFilter}
-                        onChange={(e) => setBhkFilter(e.target.value)}
-                        className="w-full bg-transparent text-xs font-bold text-[#222222] focus:outline-none mt-1 cursor-pointer"
-                      >
-                        <option value="">Any BHK</option>
-                        <option value="1">1 BHK</option>
-                        <option value="2">2 BHK</option>
-                        <option value="3">3 BHK</option>
-                        <option value="4">4+ BHK</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Quick Locality Chips & Search CTA */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
-                      <span className="font-bold text-gray-600">Popular:</span>
-                      {['Crossing Republik', 'Indirapuram', 'Sector 62', 'Gurgaon'].map((loc) => (
-                        <button
-                          key={loc}
-                          type="button"
-                          onClick={() => setSearchLocation(loc)}
-                          className="px-2.5 py-1 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition"
-                        >
-                          {loc}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => setIsVoiceOpen(true)}
-                        className="p-3 rounded-2xl bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-[#C62828] transition border border-gray-200"
-                        title="Voice Search"
-                      >
-                        <Mic className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        type="submit"
-                        className="flex-1 sm:flex-none px-6 py-3 rounded-2xl bg-[#C62828] hover:bg-[#B71C1C] text-white font-black text-xs transition shadow-md flex items-center justify-center space-x-2"
-                      >
-                        <Search className="w-4 h-4" />
-                        <span>Search Verified Flats</span>
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            </div>
-
-            {/* Right Column: Hero Real Estate Showcase Card (5 Cols) */}
-            <div className="lg:col-span-5">
-              <div className="relative bg-white rounded-3xl p-4 sm:p-5 shadow-2xl border border-gray-200 overflow-hidden group">
-                
-                {/* Real High-Rise Society Photo */}
-                <div className="relative h-72 sm:h-80 rounded-2xl overflow-hidden bg-gray-100">
-                  <img
-                    src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80"
-                    alt="Luxury Flat Living Room"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+      {/* Main Content Area */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-10">
+        {/* 2. Airbnb-Style Search Experience Hero Card */}
+        <div className="bg-white rounded-3xl p-4 sm:p-6 border border-[#EBEBEB] shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+          <form onSubmit={handleSearchSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {/* Where */}
+              <div className="p-3 bg-[#F7F7F7] hover:bg-gray-100/80 rounded-2xl transition border border-transparent focus-within:border-gray-300">
+                <label className="block text-[10px] font-extrabold uppercase text-[#717171] tracking-wider">
+                  Where
+                </label>
+                <div className="flex items-center space-x-1.5 mt-0.5">
+                  <MapPin className="w-3.5 h-3.5 text-[#C62828] shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Search Locality or City"
+                    value={searchLocation}
+                    onChange={(e) => setSearchLocation(e.target.value)}
+                    className="w-full bg-transparent font-bold text-xs text-[#222222] focus:outline-none placeholder-gray-400"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                  {/* Top Badges */}
-                  <div className="absolute top-3 left-3 flex items-center gap-2">
-                    <span className="bg-[#C62828] text-white px-3 py-1 rounded-full text-xs font-black shadow-md flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                      360° Virtual Tour
-                    </span>
-                    <span className="bg-white/90 backdrop-blur-md text-gray-900 px-2.5 py-1 rounded-full text-xs font-bold">
-                      Verified Listing
-                    </span>
-                  </div>
-
-                  {/* Interactive Button to Launch 360 Tour Immediately */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <button
-                      type="button"
-                      onClick={() => setSelected360Property(sampleFlatForHero)}
-                      className="bg-[#C62828] hover:bg-[#B71C1C] text-white px-5 py-3 rounded-2xl font-black text-xs shadow-2xl transition transform hover:scale-110 flex items-center gap-2 border-2 border-white/50"
-                    >
-                      <Compass className="w-5 h-5 animate-spin-slow" />
-                      <span>Take 360° Flat Tour Now</span>
-                    </button>
-                  </div>
-
-                  {/* Bottom Flat Summary */}
-                  <div className="absolute bottom-3 left-3 right-3 text-white">
-                    <p className="text-xs text-gray-300 font-semibold flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-[#E53935]" />
-                      Panchsheel Wellington, Crossing Republik
-                    </p>
-                    <div className="flex items-center justify-between mt-1">
-                      <h4 className="text-lg font-black text-white">3BHK Lake-Facing Flat</h4>
-                      <span className="text-xl font-black text-white bg-white/20 px-2.5 py-0.5 rounded-lg backdrop-blur-md">
-                        ₹88.0 Lakh
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Assigned Broker Highlight */}
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <img
-                      src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80"
-                      alt="Rohit Talwar"
-                      className="w-10 h-10 rounded-full object-cover border-2 border-[#C62828]"
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-[#222222]">Rohit Talwar</p>
-                      <p className="text-[10px] text-gray-500">In-House Broker • RERA UP-REA-2023-1092</p>
-                    </div>
-                  </div>
-
-                  <Link
-                    to="/contact"
-                    className="px-3.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-[#C62828] font-bold text-xs transition"
-                  >
-                    Call Broker
-                  </Link>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ======================================================== */}
-      {/* 2. EXPLORE BY CATEGORY: SIMPLE & INTUITIVE DISCOVERY     */}
-      {/* ======================================================== */}
-      <section className="py-12 bg-white border-b border-[#EEEEEE]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-8">
-            <h2 className="text-2xl sm:text-3xl font-black text-[#222222]">
-              Explore Properties by Category
-            </h2>
-            <p className="text-sm text-gray-500 mt-1 font-medium">
-              Handcrafted selections for families, working professionals, and investors.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {[
-              {
-                title: 'Ready-to-Move Flats',
-                desc: '2, 3 & 4 BHK High-Rise Condos',
-                icon: '🏢',
-                link: '/buy?propertyType=apartment',
-                badge: '18+ Available',
-              },
-              {
-                title: 'Rental Apartments',
-                desc: 'Low Deposit & Family Ready',
-                icon: '🔑',
-                link: '/rent?propertyType=apartment',
-                badge: '12+ Available',
-              },
-              {
-                title: 'Builder Floors',
-                desc: 'Private Roof & Dedicated Lift',
-                icon: '🏡',
-                link: '/buy?propertyType=independent_house',
-                badge: '8+ Available',
-              },
-              {
-                title: 'Commercial Offices',
-                desc: 'Furnished IT Parks & Retail',
-                icon: '💼',
-                link: '/commercial',
-                badge: '6+ Available',
-              },
-              {
-                title: 'Residential Plots',
-                desc: 'Clear Title Gated Townships',
-                icon: '🌳',
-                link: '/buy?propertyType=residential_plot',
-                badge: '5+ Available',
-              },
-            ].map((cat, idx) => (
-              <Link
-                key={idx}
-                to={cat.link}
-                className="bg-[#F8F8F8] hover:bg-white p-4 rounded-2xl border border-gray-200 hover:border-[#C62828] shadow-sm hover:shadow-md transition text-center group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="text-3xl mb-2">{cat.icon}</div>
-                  <h3 className="font-bold text-xs sm:text-sm text-[#222222] group-hover:text-[#C62828] transition">
-                    {cat.title}
-                  </h3>
-                  <p className="text-[11px] text-gray-500 mt-1">{cat.desc}</p>
-                </div>
-                <div className="mt-3">
-                  <span className="inline-block px-2 py-0.5 rounded-md bg-white border border-gray-200 text-[10px] font-bold text-[#C62828]">
-                    {cat.badge}
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================== */}
-      {/* 3. FEATURED PROPERTIES WITH 360° TOUR BUTTONS            */}
-      {/* ======================================================== */}
-      <section className="py-14 bg-[#F8F8F8]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Header & Filter Tabs */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
-            <div>
-              <div className="inline-flex items-center space-x-1.5 text-xs font-bold text-[#C62828] mb-1">
-                <Sparkles className="w-4 h-4" />
-                <span>Physically Inspected by Redstone</span>
+              {/* Purpose (Buy / Rent / All) */}
+              <div className="p-3 bg-[#F7F7F7] hover:bg-gray-100/80 rounded-2xl transition border border-transparent focus-within:border-gray-300">
+                <label className="block text-[10px] font-extrabold uppercase text-[#717171] tracking-wider">
+                  Type
+                </label>
+                <select
+                  value={listingType}
+                  onChange={(e) => setListingType(e.target.value)}
+                  className="w-full bg-transparent font-bold text-xs text-[#222222] focus:outline-none mt-1 cursor-pointer"
+                >
+                  <option value="all">Buy or Rent</option>
+                  <option value="sale">Buy Property</option>
+                  <option value="rent">Rent Home</option>
+                </select>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-[#222222]">
-                Featured Flats & Residences
-              </h2>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                Explore real room interiors in 360° before scheduling an on-site visit.
-              </p>
-            </div>
 
-            {/* Filter Tabs */}
-            <div className="flex items-center space-x-2 bg-white p-1 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto text-xs font-bold">
-              {[
-                { id: 'all', label: 'All Flats' },
-                { id: 'sale', label: 'For Sale' },
-                { id: 'rent', label: 'For Rent' },
-                { id: 'commercial', label: 'Commercial' },
-              ].map((tab) => (
+              {/* Bedrooms (BHK) */}
+              <div className="p-3 bg-[#F7F7F7] hover:bg-gray-100/80 rounded-2xl transition border border-transparent focus-within:border-gray-300">
+                <label className="block text-[10px] font-extrabold uppercase text-[#717171] tracking-wider">
+                  Bedrooms
+                </label>
+                <select
+                  value={bedrooms}
+                  onChange={(e) => setBedrooms(e.target.value)}
+                  className="w-full bg-transparent font-bold text-xs text-[#222222] focus:outline-none mt-1 cursor-pointer"
+                >
+                  <option value="">Any Bedrooms</option>
+                  <option value="1">1 BHK</option>
+                  <option value="2">2 BHK</option>
+                  <option value="3">3 BHK</option>
+                  <option value="4">4+ BHK</option>
+                </select>
+              </div>
+
+              {/* Max Budget */}
+              <div className="p-3 bg-[#F7F7F7] hover:bg-gray-100/80 rounded-2xl transition border border-transparent focus-within:border-gray-300">
+                <label className="block text-[10px] font-extrabold uppercase text-[#717171] tracking-wider">
+                  Budget
+                </label>
+                <select
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                  className="w-full bg-transparent font-bold text-xs text-[#222222] focus:outline-none mt-1 cursor-pointer"
+                >
+                  <option value="">Any Budget</option>
+                  <option value="3000000">Up to ₹30 Lakh</option>
+                  <option value="6000000">Up to ₹60 Lakh</option>
+                  <option value="10000000">Up to ₹1 Crore</option>
+                  <option value="25000000">Up to ₹2.5 Crore</option>
+                  <option value="50000000">Up to ₹5 Crore+</option>
+                </select>
+              </div>
+
+              {/* Search Action Button */}
+              <div className="flex items-center space-x-2">
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-xl transition shrink-0 ${
-                    activeTab === tab.id
-                      ? 'bg-[#C62828] text-white shadow-sm'
-                      : 'text-gray-600 hover:text-[#222222] hover:bg-gray-100'
+                  type="submit"
+                  className="flex-1 h-full py-3 px-4 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-2xl font-bold text-xs shadow-md transition flex items-center justify-center space-x-2"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>Search</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsFilterModalOpen(true)}
+                  className="h-full px-3 py-3 rounded-2xl border border-[#EBEBEB] hover:border-gray-400 bg-white text-[#222222] transition flex items-center justify-center"
+                  title="Open advanced filters"
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Filter Pills Row */}
+            <div className="flex items-center justify-between pt-1 text-xs">
+              <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
+                <span className="text-[11px] font-bold text-[#717171] uppercase tracking-wider hidden sm:inline">
+                  Quick:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setListingType('sale')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition border ${
+                    listingType === 'sale'
+                      ? 'border-[#222222] bg-[#222222] text-white'
+                      : 'border-[#EBEBEB] bg-white text-[#717171] hover:border-gray-400'
                   }`}
                 >
-                  {tab.label}
+                  Buy
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setListingType('rent')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition border ${
+                    listingType === 'rent'
+                      ? 'border-[#222222] bg-[#222222] text-white'
+                      : 'border-[#EBEBEB] bg-white text-[#717171] hover:border-gray-400'
+                  }`}
+                >
+                  Rent
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBedrooms('3')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition border ${
+                    bedrooms === '3'
+                      ? 'border-[#222222] bg-[#222222] text-white'
+                      : 'border-[#EBEBEB] bg-white text-[#717171] hover:border-gray-400'
+                  }`}
+                >
+                  3 BHK Flats
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMaxPrice('10000000')}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition border ${
+                    maxPrice === '10000000'
+                      ? 'border-[#222222] bg-[#222222] text-white'
+                      : 'border-[#EBEBEB] bg-white text-[#717171] hover:border-gray-400'
+                  }`}
+                >
+                  Under ₹1 Crore
+                </button>
+
+                {(searchLocation || listingType !== 'all' || maxPrice || bedrooms || selectedCategory) && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="flex items-center space-x-1 text-xs text-[#C62828] font-bold px-2 py-1 hover:underline"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reset</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="text-xs font-semibold text-[#717171] hidden md:block shrink-0">
+                {properties.length} verified listings available
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* 3. Section B: Featured Verified Properties (If Available) */}
+        {featuredProperties && featuredProperties.length > 0 && !selectedCategory && !searchLocation && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-[#222222] tracking-tight">
+                  Featured Exclusive Listings
+                </h2>
+                <p className="text-xs text-[#717171] mt-0.5">
+                  Handpicked premium residences with verified ownership and accompanied broker site tours
+                </p>
+              </div>
+
+              <Link
+                to="/buy"
+                className="text-xs font-extrabold text-[#222222] hover:text-[#C62828] flex items-center space-x-1 transition"
+              >
+                <span>View all</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {featuredProperties.slice(0, 4).map((prop) => (
+                <PropertyCard key={prop._id} property={prop} />
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* 4. Section C: Explore Properties (Airbnb 4-Column Responsive Grid) */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#222222] tracking-tight">
+                {selectedCategory
+                  ? `${selectedCategory.toUpperCase().replace('_', ' ')} IN DELHI NCR`
+                  : 'Explore Verified Properties'}
+              </h2>
+              <p className="text-xs text-[#717171] mt-0.5">
+                Physical broker inspection completed • 100% Owner Contact Privacy Protected
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-3 text-xs">
+              <span className="text-[#717171] hidden sm:inline">Sort:</span>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+                className="bg-[#F7F7F7] border border-[#EBEBEB] rounded-xl px-2.5 py-1.5 text-xs font-bold text-[#222222] focus:outline-none cursor-pointer"
+              >
+                <option value="latest">Newest First</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="featured">Featured First</option>
+              </select>
             </div>
           </div>
 
-          {/* Property Cards Grid */}
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <div key={n} className="bg-white rounded-2xl h-96 animate-pulse border border-gray-200" />
-              ))}
-            </div>
-          ) : filteredProperties.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProperties.map((prop) => (
-                <div key={prop._id} className="relative">
-                  <PropertyCard property={prop} />
+          {/* Loading Skeletons */}
+          {loading && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                <div key={n} className="space-y-3 animate-pulse">
+                  <div className="aspect-[4/3] bg-gray-200 rounded-2xl" />
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  <div className="h-4 bg-gray-200 rounded w-1/3" />
                 </div>
               ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
-              <p className="text-gray-500 font-medium">No properties found in this category.</p>
             </div>
           )}
 
-          {/* View All CTA */}
-          <div className="text-center mt-10">
-            <Link
-              to="/buy"
-              className="inline-flex items-center space-x-2 px-8 py-3.5 bg-white hover:bg-[#C62828] text-[#C62828] hover:text-white border-2 border-[#C62828] rounded-2xl font-black text-xs transition shadow-sm"
-            >
-              <span>View All 24+ Verified Properties</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================== */}
-      {/* 4. WHY REDSTONE IS DIFFERENT (HUMAN TOUCH, NO BROKER SPAM) */}
-      {/* ======================================================== */}
-      <section className="py-14 bg-white border-y border-[#EEEEEE]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="text-xs font-black text-[#C62828] uppercase tracking-wider">
-              Traditional Brokers vs. Redstone In-House Team
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-[#222222] mt-1">
-              Real Estate Without the Drama
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              How our managed brokerage model protects you from spam and fraudulent agents.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              {
-                icon: <ShieldCheck className="w-8 h-8 text-[#C62828]" />,
-                title: 'Zero Owner Spam Calls',
-                desc: 'We never publish your phone number on public forums. Only your assigned broker coordinates all enquiries.',
-              },
-              {
-                icon: <CheckCircle className="w-8 h-8 text-emerald-600" />,
-                title: '6-Point On-Site Check',
-                desc: 'Every flat is physically verified by our broker. We check title documents, carpet area, and fittings.',
-              },
-              {
-                icon: <Compass className="w-8 h-8 text-blue-600" />,
-                title: '360° Real Flat Tours',
-                desc: 'Inspect drawing halls, master bedrooms, and modular kitchens in 360° before stepping out of your home.',
-              },
-              {
-                icon: <Award className="w-8 h-8 text-amber-600" />,
-                title: '2% Transparent Fee',
-                desc: 'Institutional standard fee only on successful deal closure. No advance charges, no hidden retainers.',
-              },
-            ].map((feature, i) => (
-              <div
-                key={i}
-                className="bg-[#F8F8F8] p-6 rounded-3xl border border-gray-200 hover:border-[#C62828] transition group text-left"
-              >
-                <div className="mb-4">{feature.icon}</div>
-                <h3 className="font-bold text-base text-[#222222] mb-1.5">{feature.title}</h3>
-                <p className="text-xs text-gray-600 leading-relaxed">{feature.desc}</p>
+          {/* Empty State */}
+          {!loading && properties.length === 0 && (
+            <div className="bg-white rounded-3xl p-12 text-center border border-[#EBEBEB] max-w-lg mx-auto space-y-4">
+              <div className="w-14 h-14 bg-red-50 text-[#C62828] rounded-full flex items-center justify-center mx-auto">
+                <Home className="w-7 h-7" />
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================== */}
-      {/* 5. HOW IT WORKS: SIMPLE 3-STEP PROCESS                    */}
-      {/* ======================================================== */}
-      <section className="py-14 bg-[#F8F8F8]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-xl mx-auto mb-10">
-            <h2 className="text-2xl sm:text-3xl font-black text-[#222222]">
-              How RedStone Works
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Find, inspect, and close your flat in 3 hassle-free steps.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                step: '01',
-                title: 'Explore Flats in 360°',
-                desc: 'Browse verified flats with real 360° room walkthroughs. Get accurate carpet dimensions, society photos, and pricing upfront.',
-              },
-              {
-                step: '02',
-                title: 'Book a Free Site Visit',
-                desc: 'Select a convenient time slot. Our assigned in-house broker meets you at the society gate and accompanies you throughout the tour.',
-              },
-              {
-                step: '03',
-                title: 'Transparent Closure',
-                desc: 'We verify registry papers, draft legal agreements, and assist with loan approvals. You only pay standard 2% upon deal registration.',
-              },
-            ].map((step, idx) => (
-              <div
-                key={idx}
-                className="bg-white p-6 rounded-3xl border border-gray-200 relative text-left shadow-sm hover:shadow-md transition"
-              >
-                <span className="text-4xl font-black text-red-100 block mb-2">{step.step}</span>
-                <h3 className="text-base font-bold text-[#222222] mb-2">{step.title}</h3>
-                <p className="text-xs text-gray-600 leading-relaxed">{step.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================== */}
-      {/* 6. POPULAR LOCALITIES (DELHI NCR MICRO-MARKETS)           */}
-      {/* ======================================================== */}
-      <section className="py-14 bg-white border-b border-[#EEEEEE]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mb-8 gap-3">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-[#222222]">
-                Explore Prime Delhi NCR Localities
-              </h2>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                Current price benchmarks and connectivity in top residential hubs.
+              <h3 className="text-lg font-bold text-[#222222]">No properties found</h3>
+              <p className="text-xs text-[#717171] leading-relaxed">
+                We couldn't find any listings matching your active filters. Try expanding your budget or clearing filters.
               </p>
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="px-5 py-2.5 bg-[#222222] hover:bg-[#C62828] text-white rounded-xl text-xs font-bold transition shadow-sm"
+              >
+                Clear all filters
+              </button>
             </div>
-            <Link
-              to="/map-search"
-              className="text-xs font-bold text-[#C62828] hover:underline flex items-center gap-1"
-            >
-              <span>Open Interactive Property Map</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
+          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {POPULAR_LOCALITIES.map((loc, idx) => (
-              <Link
-                key={idx}
-                to={`/buy?search=${encodeURIComponent(loc.name)}`}
-                className="group relative rounded-3xl overflow-hidden bg-gray-100 h-64 border border-gray-200 shadow-sm hover:shadow-xl transition-all"
-              >
-                <img
-                  src={loc.image}
-                  alt={loc.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+          {/* Actual Property Cards Grid */}
+          {!loading && properties.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {properties.map((prop) => (
+                <PropertyCard key={prop._id} property={prop} />
+              ))}
+            </div>
+          )}
+        </section>
 
-                <div className="absolute bottom-4 left-4 right-4 text-white text-left">
-                  <span className="text-[10px] uppercase font-bold text-[#E53935] tracking-wider block">
-                    {loc.city}
-                  </span>
-                  <h3 className="text-lg font-black text-white">{loc.name}</h3>
-                  <p className="text-[11px] text-gray-300 mt-0.5 line-clamp-1">{loc.subtitle}</p>
-
-                  <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-white/15 text-xs font-bold">
-                    <span className="text-red-300">{loc.avgRate}</span>
-                    <span className="bg-white/20 backdrop-blur-md px-2.5 py-0.5 rounded-md text-[11px]">
-                      {loc.activeListings}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================== */}
-      {/* 7. MEET OUR IN-HOUSE BROKERS (REAL PEOPLE WITH RERA)      */}
-      {/* ======================================================== */}
-      <section className="py-14 bg-[#F8F8F8]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-xl mx-auto mb-10">
-            <span className="text-xs font-black text-[#C62828] uppercase tracking-wider">
-              Licensed In-House Professionals
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-[#222222] mt-1">
-              Meet Your Dedicated Brokers
+        {/* 5. Section D: Popular Locations (Delhi NCR Micromarkets) */}
+        <section className="space-y-4 pt-6 border-t border-[#EBEBEB]">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-[#222222] tracking-tight">
+              Popular Delhi NCR Micromarkets
             </h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Full-time salaried advisors who work for you, not street agents who spam.
+            <p className="text-xs text-[#717171] mt-0.5">
+              Explore in-demand residential societies and commercial business parks
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {IN_HOUSE_BROKERS.map((broker, idx) => (
-              <div
-                key={idx}
-                className="bg-white p-5 rounded-3xl border border-gray-200 shadow-sm hover:shadow-md transition text-center group"
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            {POPULAR_LOCALITIES.map((loc) => (
+              <button
+                key={loc.name}
+                type="button"
+                onClick={() => handleLocationClick(loc.query)}
+                className="group flex flex-col text-left rounded-2xl overflow-hidden border border-[#EBEBEB] hover:shadow-md transition duration-200"
               >
-                <div className="relative w-24 h-24 mx-auto mb-3">
+                <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
                   <img
-                    src={broker.image}
-                    alt={broker.name}
-                    className="w-full h-full rounded-full object-cover border-3 border-gray-100 group-hover:border-[#C62828] transition shadow-md"
+                    src={loc.image}
+                    alt={loc.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
-                  <div className="absolute bottom-0 right-0 bg-emerald-500 text-white p-1 rounded-full border-2 border-white">
-                    <Check className="w-3 h-3" />
-                  </div>
                 </div>
-
-                <h3 className="font-bold text-base text-[#222222]">{broker.name}</h3>
-                <p className="text-xs text-[#C62828] font-semibold mt-0.5">{broker.role}</p>
-                <p className="text-[10px] text-gray-500 mt-0.5">{broker.rera}</p>
-
-                <div className="bg-gray-50 p-2.5 rounded-xl my-3 text-left space-y-1 text-[11px] text-gray-600">
-                  <p>📍 <span className="font-bold text-[#222222]">{broker.territory}</span></p>
-                  <p>⭐ <span className="font-bold text-[#222222]">{broker.rating}</span> ({broker.reviews} client reviews)</p>
-                  <p>✓ <span className="font-bold text-[#222222]">{broker.dealsClosed}</span></p>
+                <div className="p-3 bg-white">
+                  <h4 className="font-extrabold text-xs text-[#222222] group-hover:text-[#C62828] transition truncate">
+                    {loc.name}
+                  </h4>
+                  <p className="text-[10px] text-[#717171] truncate">{loc.city}</p>
                 </div>
-
-                <div className="flex gap-2">
-                  <Link
-                    to="/contact"
-                    className="flex-1 py-2 rounded-xl bg-[#C62828] hover:bg-[#B71C1C] text-white font-bold text-xs transition"
-                  >
-                    Call Broker
-                  </Link>
-                  <Link
-                    to="/contact"
-                    className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 transition"
-                    title="Send Message"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
+              </button>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ======================================================== */}
-      {/* 8. CUSTOMER TESTIMONIALS (GENUINE INDIAN REVIEWS)        */}
-      {/* ======================================================== */}
-      <section className="py-14 bg-white border-y border-[#EEEEEE]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-xl mx-auto mb-10">
-            <h2 className="text-2xl sm:text-3xl font-black text-[#222222]">
-              What Our Clients Say
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Read real experiences from property owners, buyers, and tenants.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t, idx) => (
-              <div
-                key={idx}
-                className="bg-[#F8F8F8] p-6 rounded-3xl border border-gray-200 text-left flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center space-x-1 text-amber-500 mb-3">
-                    {[...Array(t.rating)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-700 leading-relaxed italic">
-                    "{t.comment}"
-                  </p>
-                </div>
-
-                <div className="flex items-center space-x-3 mt-4 pt-3 border-t border-gray-200">
-                  <img
-                    src={t.avatar}
-                    alt={t.name}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                  <div>
-                    <h4 className="text-xs font-bold text-[#222222]">{t.name}</h4>
-                    <p className="text-[10px] text-gray-500">{t.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================== */}
-      {/* 9. FAQ ACCORDION                                         */}
-      {/* ======================================================== */}
-      <section className="py-14 bg-[#F8F8F8]">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <h2 className="text-2xl sm:text-3xl font-black text-[#222222]">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Clear answers regarding visits, owner privacy, and brokerage charges.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {FAQ_ITEMS.map((item, idx) => {
-              const isOpen = expandedFaq === idx;
-              return (
-                <div
-                  key={idx}
-                  className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm transition"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setExpandedFaq(isOpen ? -1 : idx)}
-                    className="w-full p-4 sm:p-5 text-left flex items-center justify-between font-bold text-xs sm:text-sm text-[#222222] hover:text-[#C62828] transition"
-                  >
-                    <span>{item.q}</span>
-                    {isOpen ? (
-                      <ChevronUp className="w-4 h-4 text-[#C62828] shrink-0" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
-                    )}
-                  </button>
-
-                  {isOpen && (
-                    <div className="px-4 pb-4 sm:px-5 sm:pb-5 text-xs text-gray-600 leading-relaxed border-t border-gray-100 pt-3">
-                      {item.a}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================== */}
-      {/* 10. QUICK ADVISORY CALLBACK BAR                          */}
-      {/* ======================================================== */}
-      <section className="py-12 bg-white border-t border-[#EEEEEE]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-3xl p-6 sm:p-8 border border-red-200 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="text-left">
-              <span className="text-xs font-black text-[#C62828] uppercase tracking-wider block">
-                Free Property Consultation
+        {/* 6. Section G: List Your Property CTA (Owner Portal Gateway) */}
+        <section className="pt-6 border-t border-[#EBEBEB]">
+          <div className="bg-[#F7F7F7] rounded-3xl p-8 sm:p-12 border border-[#EBEBEB] flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="space-y-3 max-w-xl text-left">
+              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-red-100 text-[#C62828] text-xs font-bold">
+                <ShieldCheck className="w-4 h-4" />
+                <span>100% Owner Privacy Protection</span>
               </span>
-              <h3 className="text-xl sm:text-2xl font-black text-[#222222] mt-0.5">
-                Need Help Finding the Right Flat?
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-[#222222] tracking-tight">
+                Own a property in Delhi NCR? List with Redstone
               </h3>
-              <p className="text-xs text-gray-600 mt-1">
-                Leave your number and an in-house broker will call you back within 15 minutes.
+              <p className="text-xs sm:text-sm text-[#717171] leading-relaxed">
+                Zero spam calls from random agents. Your phone and email are never shown publicly.
+                A dedicated licensed broker handles physical inspections, 360° virtual tours, buyer screening, and escorted site visits.
               </p>
             </div>
 
-            {advisorySubmitted ? (
-              <div className="bg-white px-6 py-4 rounded-2xl border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2 shadow-sm">
-                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                <span>Thank you! Our broker will call you shortly.</span>
-              </div>
-            ) : (
-              <form onSubmit={handleAdvisorySubmit} className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                <input
-                  type="text"
-                  placeholder="Your Name"
-                  value={advisoryName}
-                  onChange={(e) => setAdvisoryName(e.target.value)}
-                  required
-                  className="px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-xs font-semibold focus:outline-none focus:border-[#C62828]"
-                />
-                <input
-                  type="tel"
-                  placeholder="Mobile Number"
-                  value={advisoryPhone}
-                  onChange={(e) => setAdvisoryPhone(e.target.value)}
-                  required
-                  className="px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-xs font-semibold focus:outline-none focus:border-[#C62828]"
-                />
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-[#C62828] hover:bg-[#B71C1C] text-white font-bold text-xs transition shrink-0 shadow-sm"
-                >
-                  Request Callback
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      </section>
+            <div className="shrink-0 flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <Link
+                to={user?.role === 'owner' ? '/owner/properties/add' : '/welcome'}
+                className="w-full sm:w-auto px-6 py-3.5 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-2xl font-bold text-xs shadow-md transition flex items-center justify-center space-x-2"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>List Your Property</span>
+              </Link>
 
-      {/* ======================================================== */}
-      {/* 11. INSTANT 360 MODAL (WHEN CLICKED ON ANY FLAT CARD)    */}
-      {/* ======================================================== */}
-      {selected360Property && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 animate-fade-in">
-          <div className="relative w-full max-w-5xl bg-[#1A1C23] rounded-3xl overflow-hidden shadow-2xl border border-white/20">
-            <PropertyMediaExperienceViewer
-              property={selected360Property}
-              onClose={() => setSelected360Property(null)}
-            />
+              <Link
+                to="/about"
+                className="w-full sm:w-auto px-5 py-3.5 bg-white hover:bg-gray-100 text-[#222222] border border-[#EBEBEB] rounded-2xl font-bold text-xs transition text-center"
+              >
+                Learn How It Works
+              </Link>
+            </div>
           </div>
-        </div>
-      )}
+        </section>
+      </main>
 
-      {/* Voice Search Modal */}
-      <VoiceSearchModal
-        isOpen={isVoiceOpen}
-        onClose={() => setIsVoiceOpen(false)}
-        onParsed={handleVoiceParsed}
+      {/* Advanced Airbnb-Style Filter Modal */}
+      <FilterModal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        filters={filterObject}
+        onChangeFilter={handleFilterChange}
+        onResetFilters={handleResetFilters}
+        onApplyFilters={fetchProperties}
+        totalResults={properties.length}
       />
     </div>
   );

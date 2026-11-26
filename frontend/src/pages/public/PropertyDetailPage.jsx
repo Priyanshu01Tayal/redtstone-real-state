@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import Modal from '../../components/common/Modal';
-import Badge from '../../components/common/Badge';
-import PropertyMediaExperienceViewer from '../../components/media/PropertyMediaExperienceViewer';
 import { useCompare } from '../../context/CompareContext';
+import Modal from '../../components/common/Modal';
+import PropertyCard from '../../components/common/PropertyCard';
+import PropertyMediaExperienceViewer from '../../components/media/PropertyMediaExperienceViewer';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 import {
   Bed,
   Bath,
@@ -19,17 +20,31 @@ import {
   Share2,
   Heart,
   Phone,
-  Mail,
-  Building,
   Compass,
   Layers,
-  Clock,
-  Car,
-  Eye,
   Sparkles,
   Scale,
   Video,
+  Eye,
+  Check,
+  Clock,
+  Car,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
+  Home,
+  Building2,
 } from 'lucide-react';
+
+const formatPrice = (price, listingType) => {
+  if (!price) return 'Price on Request';
+  if (price >= 10000000) {
+    return `₹${(price / 10000000).toFixed(2)} Cr`;
+  } else if (price >= 100000) {
+    return `₹${(price / 100000).toFixed(2)} Lakh`;
+  }
+  return `₹${price.toLocaleString('en-IN')}${listingType === 'rent' ? '/mo' : ''}`;
+};
 
 const PropertyDetailPage = () => {
   const { id } = useParams();
@@ -39,11 +54,12 @@ const PropertyDetailPage = () => {
   const { addToCompare, removeFromCompare, isCompared } = useCompare();
 
   const [property, setProperty] = useState(null);
+  const [relatedProperties, setRelatedProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showMediaTour, setShowMediaTour] = useState(false);
   const [tourInitialMode, setTourInitialMode] = useState('auto');
-  const [reviewActionLoading, setReviewActionLoading] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   // Auto-open 360 tour if ?tour=360 in URL
   useEffect(() => {
@@ -57,10 +73,11 @@ const PropertyDetailPage = () => {
   // Modals state
   const [enquiryModalOpen, setEnquiryModalOpen] = useState(false);
   const [visitModalOpen, setVisitModalOpen] = useState(false);
+  const [galleryModalOpen, setGalleryModalOpen] = useState(false);
 
   // Enquiry form state
   const [enquiryMessage, setEnquiryMessage] = useState(
-    'Hi, I am interested in this property and would like more details regarding terms and availability.'
+    'Hi, I am interested in this property and would like to schedule an escorted inspection with the assigned in-house broker.'
   );
   const [preferredTime, setPreferredTime] = useState('Anytime');
   const [clientBudget, setClientBudget] = useState('');
@@ -75,12 +92,27 @@ const PropertyDetailPage = () => {
   const [visitSuccess, setVisitSuccess] = useState(false);
 
   useEffect(() => {
-    const fetchProperty = async () => {
+    const fetchPropertyData = async () => {
       try {
+        setLoading(true);
         const res = await api.get(`/properties/${id}`);
-        setProperty(res.data.property);
-        if (res.data.property?.price) {
-          setClientBudget(res.data.property.price.toString());
+        const prop = res.data.property;
+        setProperty(prop);
+        if (prop?.price) {
+          setClientBudget(prop.price.toString());
+        }
+
+        // Fetch related properties in same locality or city
+        if (prop?.locality || prop?.city) {
+          api
+            .get('/properties', {
+              params: { locality: prop.locality || prop.city, limit: 5 },
+            })
+            .then((relRes) => {
+              const rel = (relRes.data?.properties || []).filter((p) => p._id !== prop._id);
+              setRelatedProperties(rel.slice(0, 4));
+            })
+            .catch(() => {});
         }
       } catch (err) {
         console.error('Failed to load property details:', err);
@@ -88,7 +120,9 @@ const PropertyDetailPage = () => {
         setLoading(false);
       }
     };
-    fetchProperty();
+
+    fetchPropertyData();
+    window.scrollTo(0, 0);
   }, [id]);
 
   const handleEnquirySubmit = async (e) => {
@@ -126,7 +160,7 @@ const PropertyDetailPage = () => {
     }
 
     if (!visitDate) {
-      alert('Please select a preferred visit date');
+      alert('Please select a visit date');
       return;
     }
 
@@ -150,598 +184,644 @@ const PropertyDetailPage = () => {
     }
   };
 
+  const handleShare = () => {
+    navigator.clipboard?.writeText(window.location.href);
+    alert('Property link copied to clipboard!');
+  };
+
+  const handleToggleFavorite = async () => {
+    setIsFavorited(!isFavorited);
+    try {
+      await api.post(`/client/favorites/${property._id}`);
+    } catch (err) {
+      setIsFavorited(isFavorited);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <div className="w-12 h-12 border-4 border-[#C62828] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-sm font-bold text-gray-500">Loading verified property details...</p>
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+        <div className="w-10 h-10 border-4 border-[#C62828] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-xs font-bold text-[#717171]">Loading verified property details...</p>
       </div>
     );
   }
 
   if (!property) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-2xl font-bold text-[#222222]">Property Not Found</h2>
-        <p className="text-sm text-gray-500 mt-2">The property may have been sold or unlisted.</p>
-        <Link to="/" className="inline-block mt-4 text-[#C62828] font-bold">
-          ← Return to Home
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center space-y-4">
+        <h2 className="text-2xl font-black text-[#222222]">Property Not Found</h2>
+        <p className="text-xs text-[#717171]">The property listing may have expired or been unlisted.</p>
+        <Link
+          to="/marketplace"
+          className="inline-block px-5 py-2.5 bg-[#C62828] text-white rounded-xl text-xs font-bold"
+        >
+          Return to Marketplace
         </Link>
       </div>
     );
   }
 
-  const broker = property.assignedBrokerId;
-  const images = property.images && property.images.length > 0 ? property.images : [{ url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80' }];
+  const broker = typeof property.assignedBrokerId === 'object' && property.assignedBrokerId !== null
+    ? property.assignedBrokerId
+    : null;
 
-  // 3D / 360 / Walkthrough Experience Capabilities Detection
-  const has3DModel = property.threeDExperience?.experienceType === '3d_mesh' && !!property.threeDExperience?.modelUrl;
-  const has360Pano = (property.threeDExperience?.experienceType === '360_tour') ||
+  const rawImages = Array.isArray(property.images) ? property.images : [];
+  const images = rawImages.length > 0
+    ? rawImages.map((img) =>
+        typeof img === 'string'
+          ? { url: img }
+          : img && img.url
+          ? img
+          : { url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80' }
+      )
+    : [{ url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80' }];
+
+  const amenitiesList = Array.isArray(property.amenities)
+    ? property.amenities
+    : typeof property.amenities === 'string'
+    ? property.amenities.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const has360 =
+    property.threeDExperience?.status === 'published' ||
     (property.threeDExperience?.panoramaScenes?.length > 0) ||
-    (property.categorizedMedia?.panoramas?.length > 0) ||
-    (property.images?.some((img) => img.isPanorama));
-  const hasPhotoTour = (property.threeDExperience?.walkthroughRooms?.length > 0) ||
-    (property.images && property.images.length > 0);
-  const hasVideoWalkthrough = (property.videos && property.videos.length > 0) ||
+    (property.categorizedMedia?.panoramas?.length > 0);
+
+  const hasWalkthroughVideo =
+    (property.videos && property.videos.length > 0) ||
     (property.categorizedMedia?.walkthroughVideos && property.categorizedMedia.walkthroughVideos.length > 0);
 
+  const compared = isCompared?.(property._id);
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Breadcrumb & Quick Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-2 text-xs font-semibold text-gray-500">
-          <Link to="/" className="hover:text-[#C62828]">Home</Link>
-          <span>/</span>
-          <Link to={`/${property.listingType === 'sale' ? 'buy' : 'rent'}`} className="hover:text-[#C62828] capitalize">
-            {property.listingType}
-          </Link>
-          <span>/</span>
-          <span className="text-gray-900 truncate max-w-xs">{property.title}</span>
-        </div>
-
-        <div className="flex items-center space-x-3">
-          {/* Compare Property Button */}
-          <button
-            onClick={() => {
-              isCompared?.(property._id)
-                ? removeFromCompare?.(property._id)
-                : addToCompare?.(property);
-            }}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
-              isCompared?.(property._id)
-                ? 'bg-red-50 text-[#C62828] border-red-200 shadow-sm'
-                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5 text-[#C62828]" />
-            <span>{isCompared?.(property._id) ? 'Added to Compare ✓' : '+ Compare'}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              navigator.clipboard?.writeText(window.location.href);
-              alert('Property link copied to clipboard!');
-            }}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Share</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Broker / Admin 3D Experience Management Bar */}
-      {(user?.role === 'admin' || user?.role === 'broker') && (
-        <div className="bg-gradient-to-r from-gray-900 to-[#222222] text-white p-4 rounded-2xl border border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
-          <div className="flex items-center space-x-3 text-xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#E53935] animate-ping" />
+    <div className="bg-[#FFFFFF] min-h-screen text-[#222222]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* 1. Header: Title, Location & Quick Actions (Airbnb Style) */}
+        <div className="space-y-2">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
             <div>
-              <span className="text-gray-400 block text-[10px] font-bold uppercase tracking-wider">
-                Interactive Media Experience Lifecycle
-              </span>
-              <span className="font-extrabold text-white">
-                Status: <span className="text-[#E53935] uppercase">{property.threeDExperience?.status || 'NOT_REQUESTED'}</span>
-                {' '}({property.threeDExperience?.experienceType || 'Standard Media'})
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setShowMediaTour(true);
-              }}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold text-white transition flex items-center gap-1"
-            >
-              <Eye className="w-3.5 h-3.5" /> Preview Tour
-            </button>
-
-            {property.threeDExperience?.status === 'ready_for_review' && (
-              <button
-                disabled={reviewActionLoading}
-                onClick={async () => {
-                  setReviewActionLoading(true);
-                  try {
-                    await api.put(`/properties/${property._id}/3d-experience/review`, { action: 'approve' });
-                    setProperty((prev) => ({
-                      ...prev,
-                      threeDExperience: { ...prev.threeDExperience, status: 'approved' },
-                    }));
-                    alert('Experience approved! You can now publish it.');
-                  } catch (e) {
-                    alert('Action failed: ' + e.message);
-                  } finally {
-                    setReviewActionLoading(false);
-                  }
-                }}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition"
-              >
-                ✓ Approve Experience
-              </button>
-            )}
-
-            {(property.threeDExperience?.status === 'approved' || property.threeDExperience?.status === 'ready_for_review') && (
-              <button
-                disabled={reviewActionLoading}
-                onClick={async () => {
-                  setReviewActionLoading(true);
-                  try {
-                    await api.put(`/properties/${property._id}/3d-experience/review`, { action: 'publish' });
-                    setProperty((prev) => ({
-                      ...prev,
-                      threeDExperience: { ...prev.threeDExperience, status: 'published' },
-                    }));
-                    alert('Experience published to public property page!');
-                  } catch (e) {
-                    alert('Publish failed: ' + e.message);
-                  } finally {
-                    setReviewActionLoading(false);
-                  }
-                }}
-                className="px-3 py-1.5 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-xs font-bold transition"
-              >
-                Publish Experience
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Title & Price Header */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#EEEEEE] shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#C62828] text-white">
-              FOR {property.listingType?.toUpperCase()}
-            </span>
-            <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-gray-100 text-gray-800 capitalize">
-              {property.propertyType?.replace('_', ' ')}
-            </span>
-            {property.featured && (
-              <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
-                <Star className="w-3 h-3 fill-current" /> Verified Exclusive
-              </span>
-            )}
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl font-black text-[#222222]">{property.title}</h1>
-          <div className="flex items-center text-xs font-medium text-gray-500 mt-2">
-            <MapPin className="w-4 h-4 text-[#C62828] mr-1 shrink-0" />
-            <span>{property.address}, {property.locality}, {property.city}, {property.state} - {property.pincode}</span>
-          </div>
-        </div>
-
-        {/* Pricing */}
-        <div className="lg:text-right border-t lg:border-t-0 pt-4 lg:pt-0 border-gray-100">
-          <div className="text-3xl sm:text-4xl font-black text-[#C62828]">
-            {property.price >= 10000000
-              ? `₹${(property.price / 10000000).toFixed(2)} Cr`
-              : `₹${property.price.toLocaleString('en-IN')}`}
-            {property.listingType === 'rent' && <span className="text-sm font-semibold text-gray-500"> / month</span>}
-          </div>
-          {property.pricePerSqFt && (
-            <p className="text-xs text-gray-500 mt-1 font-semibold">
-              ₹{property.pricePerSqFt.toLocaleString('en-IN')} per {property.areaUnit || 'sq ft'}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Media Gallery & Interactive Experience Controls */}
-      <div className="space-y-4">
-        {/* Experience Switcher Action Buttons */}
-        <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-[#EEEEEE] shadow-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* 3D Model Tour Button (ONLY rendered when valid 3D model exists) */}
-            {has3DModel && (
-              <button
-                onClick={() => {
-                  setTourInitialMode('3d');
-                  setShowMediaTour(true);
-                }}
-                className="px-4 py-2 bg-gradient-to-r from-red-600 to-[#C62828] text-white rounded-xl text-xs font-black shadow-md hover:shadow-lg transition flex items-center space-x-1.5"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>3D Spatial Tour</span>
-              </button>
-            )}
-
-            {/* 360 Panorama Tour Button (ONLY rendered when panoramic media exists) */}
-            {has360Pano && (
-              <button
-                onClick={() => {
-                  setTourInitialMode('360');
-                  setShowMediaTour(true);
-                }}
-                className="px-4 py-2 bg-[#222222] hover:bg-[#C62828] text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-1.5"
-              >
-                <Compass className="w-4 h-4 text-[#E53935]" />
-                <span>360° Virtual Tour</span>
-              </button>
-            )}
-
-            {/* Photo Walkthrough Tour Button */}
-            {hasPhotoTour && (
-              <button
-                onClick={() => {
-                  setTourInitialMode('walkthrough');
-                  setShowMediaTour(true);
-                }}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
-              >
-                <Eye className="w-4 h-4 text-gray-600" />
-                <span>Photo Walkthrough</span>
-              </button>
-            )}
-
-            {/* Video Walkthrough Button */}
-            {hasVideoWalkthrough && (
-              <a
-                href="#video-section"
-                className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition flex items-center space-x-1.5"
-              >
-                <Video className="w-4 h-4 text-[#C62828]" />
-                <span>Video Tour</span>
-              </a>
-            )}
-          </div>
-
-          <div className="text-xs text-gray-400 font-semibold hidden md:block">
-            {images.length} High-Res Verified Photos
-          </div>
-        </div>
-
-        {/* Interactive Experience Modal / Drawer Viewport */}
-        {showMediaTour && (
-          <div className="mb-6 animate-fade-in">
-            <PropertyMediaExperienceViewer
-              property={property}
-              onClose={() => setShowMediaTour(false)}
-            />
-          </div>
-        )}
-
-        {/* Main Photo Viewport */}
-        {!showMediaTour && (
-          <div className="relative h-[380px] sm:h-[500px] w-full rounded-3xl overflow-hidden bg-gray-900 border border-[#EEEEEE] shadow-md group">
-            <img
-              src={images[activeImageIndex]?.url}
-              alt={property.title}
-              className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
-            />
-            {images[activeImageIndex]?.caption && (
-              <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-md px-4 py-1.5 rounded-xl text-white text-xs font-bold">
-                {images[activeImageIndex].caption}
+              <div className="flex items-center space-x-2 text-xs font-bold text-[#C62828] uppercase tracking-wider mb-1">
+                <span>FOR {property.listingType?.toUpperCase()}</span>
+                <span>•</span>
+                <span className="capitalize">{property.propertyType?.replace('_', ' ')}</span>
+                {property.featured && (
+                  <>
+                    <span>•</span>
+                    <span className="text-amber-600 flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-current" /> Exclusive
+                    </span>
+                  </>
+                )}
               </div>
-            )}
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#222222] tracking-tight">
+                {property.title}
+              </h1>
+              <div className="flex items-center space-x-2 text-xs text-[#717171] mt-1">
+                <MapPin className="w-3.5 h-3.5 text-[#C62828] shrink-0" />
+                <span>
+                  {property.address ? `${property.address}, ` : ''}
+                  {property.locality}, {property.city} - {property.pincode}
+                </span>
+              </div>
+            </div>
 
-            {/* Floating 360/Tour CTA on Top-Right of Main Photo */}
-            {(has360Pano || hasPhotoTour) && (
+            {/* Action Buttons: Share, Favorite, Compare */}
+            <div className="flex items-center space-x-2 shrink-0 pt-2 md:pt-0">
               <button
-                onClick={() => {
-                  setTourInitialMode(has360Pano ? '360' : 'walkthrough');
-                  setShowMediaTour(true);
-                }}
-                className="absolute top-4 right-4 bg-[#C62828]/95 hover:bg-[#B71C1C] text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-lg flex items-center space-x-1.5 transition transform hover:scale-105"
+                type="button"
+                onClick={handleShare}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-full border border-[#EBEBEB] hover:bg-[#F7F7F7] text-xs font-bold text-[#222222] transition"
               >
-                <Compass className="w-4 h-4" />
-                <span>{has360Pano ? 'Launch 360° Tour' : 'Launch Walkthrough'}</span>
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share</span>
               </button>
-            )}
-          </div>
-        )}
 
-        {/* Thumbnail Selector */}
-        {!showMediaTour && images.length > 1 && (
-          <div className="flex items-center space-x-3 overflow-x-auto pb-2">
-            {images.map((img, idx) => (
               <button
-                key={idx}
-                onClick={() => setActiveImageIndex(idx)}
-                className={`relative w-24 h-16 rounded-xl overflow-hidden shrink-0 border-2 transition ${
-                  activeImageIndex === idx ? 'border-[#C62828] scale-105' : 'border-transparent opacity-70 hover:opacity-100'
+                type="button"
+                onClick={handleToggleFavorite}
+                className="flex items-center space-x-1.5 px-3.5 py-2 rounded-full border border-[#EBEBEB] hover:bg-[#F7F7F7] text-xs font-bold text-[#222222] transition"
+              >
+                <Heart
+                  className={`w-3.5 h-3.5 ${
+                    isFavorited ? 'fill-[#C62828] text-[#C62828]' : 'text-[#222222]'
+                  }`}
+                />
+                <span>{isFavorited ? 'Saved' : 'Save'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  compared ? removeFromCompare?.(property._id) : addToCompare?.(property);
+                }}
+                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-full border text-xs font-bold transition ${
+                  compared
+                    ? 'border-[#C62828] bg-red-50 text-[#C62828]'
+                    : 'border-[#EBEBEB] hover:bg-[#F7F7F7] text-[#222222]'
                 }`}
               >
-                <img src={img.url} alt="" className="w-full h-full object-cover" />
+                <Scale className="w-3.5 h-3.5 text-[#C62828]" />
+                <span>{compared ? 'Compared ✓' : '+ Compare'}</span>
               </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Main Grid: Details on Left, Broker & Actions on Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Details & Overview */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Quick Specs Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-[#EEEEEE] shadow-sm text-center">
-              <span className="text-xs text-gray-500 font-semibold block">Total Area</span>
-              <div className="flex items-center justify-center space-x-1 font-black text-lg text-[#222222] mt-1">
-                <Maximize2 className="w-4 h-4 text-[#C62828]" />
-                <span>{property.area} {property.areaUnit || 'sq ft'}</span>
-              </div>
-            </div>
-
-            {property.bedrooms > 0 && (
-              <div className="bg-white p-4 rounded-2xl border border-[#EEEEEE] shadow-sm text-center">
-                <span className="text-xs text-gray-500 font-semibold block">Bedrooms</span>
-                <div className="flex items-center justify-center space-x-1 font-black text-lg text-[#222222] mt-1">
-                  <Bed className="w-4 h-4 text-[#C62828]" />
-                  <span>{property.bedrooms} BHK</span>
-                </div>
-              </div>
-            )}
-
-            {property.bathrooms > 0 && (
-              <div className="bg-white p-4 rounded-2xl border border-[#EEEEEE] shadow-sm text-center">
-                <span className="text-xs text-gray-500 font-semibold block">Bathrooms</span>
-                <div className="flex items-center justify-center space-x-1 font-black text-lg text-[#222222] mt-1">
-                  <Bath className="w-4 h-4 text-[#C62828]" />
-                  <span>{property.bathrooms} Baths</span>
-                </div>
-              </div>
-            )}
-
-            <div className="bg-white p-4 rounded-2xl border border-[#EEEEEE] shadow-sm text-center">
-              <span className="text-xs text-gray-500 font-semibold block">Furnishing</span>
-              <div className="flex items-center justify-center space-x-1 font-black text-sm text-[#222222] mt-1 capitalize">
-                <span>{property.furnishing?.replace('-', ' ')}</span>
-              </div>
             </div>
           </div>
-
-          {/* Detailed Specifications */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#EEEEEE] shadow-sm">
-            <h3 className="text-lg font-black text-[#222222] mb-4">Property Specifications</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-xs">
-              <div>
-                <span className="text-gray-400 font-semibold">Floor</span>
-                <p className="font-bold text-gray-800 text-sm mt-0.5">{property.floorNumber} of {property.totalFloors}</p>
-              </div>
-              <div>
-                <span className="text-gray-400 font-semibold">Facing</span>
-                <p className="font-bold text-gray-800 text-sm mt-0.5">{property.facing || 'East'}</p>
-              </div>
-              <div>
-                <span className="text-gray-400 font-semibold">Parking</span>
-                <p className="font-bold text-gray-800 text-sm mt-0.5 capitalize">{property.parking || '1 Covered'}</p>
-              </div>
-              <div>
-                <span className="text-gray-400 font-semibold">Availability</span>
-                <p className="font-bold text-gray-800 text-sm mt-0.5 capitalize">{property.availability?.replace('_', ' ') || 'Immediate'}</p>
-              </div>
-              <div>
-                <span className="text-gray-400 font-semibold">Age of Property</span>
-                <p className="font-bold text-gray-800 text-sm mt-0.5 capitalize">{property.ageOfProperty?.replace('_', ' ') || '0-1 Years'}</p>
-              </div>
-              <div>
-                <span className="text-gray-400 font-semibold">Balconies</span>
-                <p className="font-bold text-gray-800 text-sm mt-0.5">{property.balconies || 0}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#EEEEEE] shadow-sm">
-            <h3 className="text-lg font-black text-[#222222] mb-4">About this Property</h3>
-            <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">
-              {property.description}
-            </p>
-          </div>
-
-          {/* Amenities */}
-          {property.amenities && property.amenities.length > 0 && (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#EEEEEE] shadow-sm">
-              <h3 className="text-lg font-black text-[#222222] mb-4">Amenities & Features</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {property.amenities.map((amenity, i) => (
-                  <div key={i} className="flex items-center space-x-2 p-2.5 rounded-xl bg-[#F8F8F8] border border-gray-100 text-xs font-semibold text-gray-700">
-                    <CheckCircle className="w-4 h-4 text-[#C62828] shrink-0" />
-                    <span>{amenity}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Video Walkthrough if present */}
-          {hasVideoWalkthrough && (
-            <div id="video-section" className="bg-white rounded-3xl p-6 sm:p-8 border border-[#EEEEEE] shadow-sm">
-              <h3 className="text-lg font-black text-[#222222] mb-4">Video Walkthrough</h3>
-              <div className="rounded-2xl overflow-hidden aspect-video bg-black">
-                <video controls className="w-full h-full object-cover">
-                  <source
-                    src={
-                      property.videos?.[0]?.url ||
-                      property.categorizedMedia?.walkthroughVideos?.[0]?.url
-                    }
-                    type="video/mp4"
-                  />
-                  Your browser does not support video playback.
-                </video>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Right Column: Broker Representation & Actions */}
-        <div className="space-y-6">
-          {/* Assigned In-House Broker Card (CRITICAL PRIVACY RULE: Client communicates ONLY with broker) */}
-          <div className="bg-white rounded-3xl p-6 border border-[#EEEEEE] shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-red-50 rounded-bl-full -z-0" />
+        {/* 2. Interactive 3D / 360 Tour Experience Viewport (When Active) */}
+        {showMediaTour && (
+          <div className="rounded-3xl overflow-hidden border border-[#EBEBEB] shadow-xl animate-fade-in mb-6">
+            <ErrorBoundary>
+              <PropertyMediaExperienceViewer
+                property={property}
+                onClose={() => setShowMediaTour(false)}
+              />
+            </ErrorBoundary>
+          </div>
+        )}
 
-            <div className="relative z-10">
-              <div className="flex items-center space-x-2 text-xs font-black uppercase tracking-wider text-[#C62828] mb-3">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Assigned In-House Broker</span>
+        {/* 3. Airbnb Signature 5-Photo Gallery Grid (Desktop) / Carousel (Mobile) */}
+        {!showMediaTour && (
+          <div className="relative">
+            {/* Desktop 5-Photo Grid */}
+            <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-2 h-[420px] rounded-3xl overflow-hidden">
+              {/* Main Large Hero Image (Cols 1-2, Rows 1-2) */}
+              <div
+                onClick={() => setGalleryModalOpen(true)}
+                className="col-span-2 row-span-2 relative group overflow-hidden cursor-pointer bg-gray-100"
+              >
+                <img
+                  src={images[0]?.url}
+                  alt={property.title}
+                  className="w-full h-full object-cover group-hover:scale-103 transition duration-500"
+                />
               </div>
 
-              {broker ? (
-                <div>
-                  <div className="flex items-center space-x-4 mb-4">
-                    <img
-                      src={broker.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80'}
-                      alt={broker.name}
-                      className="w-16 h-16 rounded-2xl object-cover border-2 border-[#C62828] shadow-md"
-                    />
-                    <div>
-                      <h4 className="font-bold text-base text-[#222222]">{broker.name}</h4>
-                      <p className="text-xs text-gray-500 font-medium">Licensed Brokerage Consultant</p>
-                      <div className="flex items-center text-xs text-amber-600 font-bold mt-1">
-                        <Star className="w-3.5 h-3.5 fill-current mr-1" />
-                        <span>{broker.rating || '4.9'} / 5.0 Rating</span>
-                      </div>
-                    </div>
-                  </div>
+              {/* Grid Photo 2 */}
+              <div
+                onClick={() => setGalleryModalOpen(true)}
+                className="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer bg-gray-100"
+              >
+                <img
+                  src={images[1]?.url || images[0]?.url}
+                  alt=""
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                />
+              </div>
 
-                  <div className="bg-[#F8F8F8] p-3 rounded-2xl border border-gray-100 text-xs space-y-1 mb-6 text-gray-600">
-                    <p><strong>License:</strong> {broker.licenseNumber || 'DL-REA-2021-9872'}</p>
-                    <p><strong>Experience:</strong> {broker.experienceYears || '8'} Years in Real Estate</p>
-                    {broker.specialization && (
-                      <p>
-                        <strong>Expertise:</strong>{' '}
-                        {Array.isArray(broker.specialization)
-                          ? broker.specialization.join(', ')
-                          : broker.specialization}
-                      </p>
-                    )}
-                    {broker.serviceAreas && (
-                      <p>
-                        <strong>Areas:</strong>{' '}
-                        {Array.isArray(broker.serviceAreas)
-                          ? broker.serviceAreas.join(', ')
-                          : broker.serviceAreas}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="mb-6 p-4 rounded-2xl bg-[#F8F8F8] text-xs text-gray-600">
-                  <p className="font-bold text-[#222222] mb-1">RedStone In-House Advisory Desk</p>
-                  <p>A senior brokerage consultant is assigned to this listing to guide your inspection and negotiation.</p>
+              {/* Grid Photo 3 */}
+              <div
+                onClick={() => setGalleryModalOpen(true)}
+                className="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer bg-gray-100"
+              >
+                <img
+                  src={images[2]?.url || images[0]?.url}
+                  alt=""
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                />
+              </div>
+
+              {/* Grid Photo 4 */}
+              <div
+                onClick={() => setGalleryModalOpen(true)}
+                className="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer bg-gray-100"
+              >
+                <img
+                  src={images[3]?.url || images[0]?.url}
+                  alt=""
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                />
+              </div>
+
+              {/* Grid Photo 5 */}
+              <div
+                onClick={() => setGalleryModalOpen(true)}
+                className="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer bg-gray-100"
+              >
+                <img
+                  src={images[4]?.url || images[0]?.url}
+                  alt=""
+                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                />
+              </div>
+            </div>
+
+            {/* Mobile Single Photo Carousel */}
+            <div className="md:hidden relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100">
+              <img
+                src={images[activeImageIndex]?.url}
+                alt={property.title}
+                className="w-full h-full object-cover"
+              />
+              {images.length > 1 && (
+                <div className="absolute bottom-3 right-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-full text-white text-[10px] font-bold">
+                  {activeImageIndex + 1} / {images.length}
                 </div>
               )}
+            </div>
+
+            {/* Floating Action Badges on Gallery */}
+            <div className="absolute bottom-4 right-4 flex items-center space-x-2 z-10">
+              {has360 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTourInitialMode('360');
+                    setShowMediaTour(true);
+                  }}
+                  className="px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center space-x-1.5"
+                >
+                  <Compass className="w-4 h-4 animate-spin-slow" />
+                  <span>360° Virtual Tour</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setGalleryModalOpen(true)}
+                className="px-3.5 py-2 bg-white/95 hover:bg-white text-[#222222] rounded-xl text-xs font-bold shadow-md border border-[#EBEBEB] transition flex items-center space-x-1"
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>Show all {images.length} photos</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Two-Column Main Layout: Details on Left (8 Cols), Sticky Booking Card on Right (4 Cols) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-4">
+          {/* LEFT COLUMN: Overview, Host Broker, Specs, Description, Amenities */}
+          <div className="lg:col-span-8 space-y-8">
+            {/* Overview Headline */}
+            <div className="pb-6 border-b border-[#EBEBEB]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[#222222]">
+                    Entire {property.propertyType?.replace('_', ' ')} in {property.locality}
+                  </h2>
+                  <div className="flex items-center space-x-2 text-xs text-[#717171] mt-1 font-semibold">
+                    {property.bedrooms > 0 && <span>{property.bedrooms} Bedrooms</span>}
+                    {property.bedrooms > 0 && <span>•</span>}
+                    {property.bathrooms > 0 && <span>{property.bathrooms} Bathrooms</span>}
+                    {property.bathrooms > 0 && <span>•</span>}
+                    <span>{property.area} {property.areaUnit || 'sq ft'}</span>
+                    <span>•</span>
+                    <span className="capitalize">{property.furnishing?.replace('-', ' ')}</span>
+                  </div>
+                </div>
+
+                {broker && (
+                  <img
+                    src={broker.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80'}
+                    alt={broker.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#C62828] shadow-sm shrink-0"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* In-House Broker Representation & Trust Highlights */}
+            <div className="space-y-4 pb-6 border-b border-[#EBEBEB]">
+              <div className="flex items-start space-x-4">
+                <ShieldCheck className="w-6 h-6 text-[#C62828] shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-sm text-[#222222]">Dedicated Licensed In-House Broker</h4>
+                  <p className="text-xs text-[#717171] mt-0.5 leading-relaxed">
+                    Assigned broker {broker?.name || 'Redstone Team'} has physically inspected this property, verified documents, and will escort your site visit.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-bold text-sm text-[#222222]">100% Owner Contact Privacy Protection</h4>
+                  <p className="text-xs text-[#717171] mt-0.5 leading-relaxed">
+                    Zero spam or unsolicited phone calls. All scheduling and negotiations flow through our licensed brokerage team.
+                  </p>
+                </div>
+              </div>
+
+              {has360 && (
+                <div className="flex items-start space-x-4">
+                  <Compass className="w-6 h-6 text-[#C62828] shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-sm text-[#222222]">360° Spherical Virtual Tour Available</h4>
+                    <p className="text-xs text-[#717171] mt-0.5 leading-relaxed">
+                      Inspect the living room, bedrooms, and kitchen virtually in 360° before booking your physical site visit.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Property Specifications Grid */}
+            <div className="space-y-3 pb-6 border-b border-[#EBEBEB]">
+              <h3 className="text-base font-extrabold text-[#222222]">Property Specifications</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 bg-[#F7F7F7] rounded-2xl">
+                  <span className="text-[#717171] text-[10px] font-bold uppercase">Floor Level</span>
+                  <p className="font-extrabold text-[#222222] mt-0.5">
+                    {property.floorNumber ? `${property.floorNumber} of ${property.totalFloors}` : 'Mid Floor'}
+                  </p>
+                </div>
+
+                <div className="p-3 bg-[#F7F7F7] rounded-2xl">
+                  <span className="text-[#717171] text-[10px] font-bold uppercase">Facing</span>
+                  <p className="font-extrabold text-[#222222] mt-0.5">{property.facing || 'East'}</p>
+                </div>
+
+                <div className="p-3 bg-[#F7F7F7] rounded-2xl">
+                  <span className="text-[#717171] text-[10px] font-bold uppercase">Reserved Parking</span>
+                  <p className="font-extrabold text-[#222222] mt-0.5 capitalize">{property.parking || '1 Covered Slot'}</p>
+                </div>
+
+                <div className="p-3 bg-[#F7F7F7] rounded-2xl">
+                  <span className="text-[#717171] text-[10px] font-bold uppercase">Availability</span>
+                  <p className="font-extrabold text-[#222222] mt-0.5 capitalize">
+                    {property.availability?.replace('_', ' ') || 'Ready to Move'}
+                  </p>
+                </div>
+
+                <div className="p-3 bg-[#F7F7F7] rounded-2xl">
+                  <span className="text-[#717171] text-[10px] font-bold uppercase">Age of Property</span>
+                  <p className="font-extrabold text-[#222222] mt-0.5 capitalize">
+                    {property.ageOfProperty?.replace('_', ' ') || '0-2 Years'}
+                  </p>
+                </div>
+
+                <div className="p-3 bg-[#F7F7F7] rounded-2xl">
+                  <span className="text-[#717171] text-[10px] font-bold uppercase">Balconies</span>
+                  <p className="font-extrabold text-[#222222] mt-0.5">{property.balconies || 2} Open Balconies</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Description / About this Property */}
+            <div className="space-y-3 pb-6 border-b border-[#EBEBEB]">
+              <h3 className="text-base font-extrabold text-[#222222]">About this Property</h3>
+              <p className="text-xs sm:text-sm text-[#717171] leading-relaxed whitespace-pre-line">
+                {property.description}
+              </p>
+            </div>
+
+            {/* Amenities Grid */}
+            {amenitiesList.length > 0 && (
+              <div className="space-y-4 pb-6 border-b border-[#EBEBEB]">
+                <h3 className="text-base font-extrabold text-[#222222]">What this property offers</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {amenitiesList.map((amenity, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center space-x-2.5 p-3 rounded-2xl border border-[#EBEBEB] text-xs font-semibold text-[#222222]"
+                    >
+                      <Check className="w-4 h-4 text-[#C62828] shrink-0" />
+                      <span>{amenity}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assigned In-House Broker Profile */}
+            {broker && (
+              <div className="p-6 rounded-3xl border border-[#EBEBEB] bg-[#F7F7F7] space-y-4">
+                <div className="flex items-center space-x-4">
+                  <img
+                    src={broker.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80'}
+                    alt={broker.name}
+                    className="w-16 h-16 rounded-2xl object-cover border-2 border-[#C62828] shadow-sm"
+                  />
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-[#C62828] tracking-wider">
+                      Assigned Licensed In-House Broker
+                    </span>
+                    <h4 className="text-base font-extrabold text-[#222222]">{broker.name}</h4>
+                    <p className="text-xs text-[#717171]">
+                      {broker.experienceYears || '7+'} Years Experience • {broker.licenseNumber || 'DL-REA-2021-9872'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs pt-2">
+                  <div className="p-3 bg-white rounded-xl border border-[#EBEBEB]">
+                    <span className="text-[#717171] text-[10px] font-bold">Specialization</span>
+                    <p className="font-bold text-[#222222]">
+                      {Array.isArray(broker.specialization) ? broker.specialization.join(', ') : broker.specialization || 'Residential Flats'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-white rounded-xl border border-[#EBEBEB]">
+                    <span className="text-[#717171] text-[10px] font-bold">Consultant Rating</span>
+                    <p className="font-bold text-amber-700 flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 fill-current" />
+                      {broker.rating || '4.95'} / 5.0 (Verified Closures)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Sticky Booking / Enquiry Panel (Airbnb Style) */}
+          <div className="lg:col-span-4">
+            <div className="sticky top-28 bg-white rounded-3xl p-6 border border-[#EBEBEB] shadow-[0_6px_24px_rgba(0,0,0,0.08)] space-y-5">
+              {/* Price Display */}
+              <div>
+                <div className="flex items-baseline space-x-2">
+                  <span className="text-3xl font-black text-[#222222]">
+                    {formatPrice(property.price, property.listingType)}
+                  </span>
+                  {property.listingType === 'rent' && (
+                    <span className="text-xs font-semibold text-[#717171]">/ month</span>
+                  )}
+                </div>
+                {property.pricePerSqFt && (
+                  <p className="text-xs text-[#717171] mt-0.5">
+                    ₹{Number(property.pricePerSqFt) ? Number(property.pricePerSqFt).toLocaleString('en-IN') : property.pricePerSqFt} per {property.areaUnit || 'sq ft'}
+                  </p>
+                )}
+              </div>
 
               {/* Action Buttons */}
-              <div className="space-y-3">
+              <div className="space-y-3 pt-2">
                 <button
+                  type="button"
                   onClick={() => setVisitModalOpen(true)}
-                  className="w-full py-3.5 px-4 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-2xl font-bold text-sm shadow-md hover:shadow-lg transition flex items-center justify-center space-x-2"
+                  className="w-full py-3.5 px-4 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-2xl font-bold text-xs shadow-md transition flex items-center justify-center space-x-2"
                 >
                   <Calendar className="w-4 h-4" />
-                  <span>Schedule Property Visit</span>
+                  <span>Schedule Accompanied Visit</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => setEnquiryModalOpen(true)}
-                  className="w-full py-3.5 px-4 bg-white hover:bg-gray-50 text-[#222222] border-2 border-gray-200 rounded-2xl font-bold text-sm transition flex items-center justify-center space-x-2"
+                  className="w-full py-3.5 px-4 bg-white hover:bg-[#F7F7F7] text-[#222222] border-2 border-[#222222] rounded-2xl font-bold text-xs transition flex items-center justify-center space-x-2"
                 >
                   <MessageSquare className="w-4 h-4 text-[#C62828]" />
                   <span>Send Direct Enquiry</span>
                 </button>
               </div>
 
-              {/* Privacy Notice */}
-              <div className="mt-6 pt-4 border-t border-gray-100 text-[11px] text-gray-400 flex items-start space-x-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Privacy Protected:</strong> All communications flow exclusively through our assigned in-house broker. Zero third-party spam.
-                </span>
+              {/* Verified Privacy Note */}
+              <div className="p-4 bg-[#F7F7F7] rounded-2xl border border-[#EBEBEB] text-[11px] text-[#717171] space-y-1">
+                <div className="flex items-center space-x-1.5 font-bold text-[#222222]">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Zero Spam Guarantee</span>
+                </div>
+                <p className="leading-relaxed">
+                  Your contact details are strictly protected. Only our assigned licensed broker contacts you to arrange visits.
+                </p>
+              </div>
+
+              {/* Brokerage Transparency */}
+              <div className="flex items-center justify-between text-xs text-[#717171] pt-2 border-t border-[#EBEBEB]">
+                <span>Brokerage Rate</span>
+                <span className="font-bold text-[#222222]">Standard 2% on Closure</span>
               </div>
             </div>
           </div>
-
-          {/* Quick Help Box */}
-          <div className="bg-[#222222] text-white rounded-3xl p-6 text-xs">
-            <h5 className="font-bold text-sm mb-2">Need Immediate Assistance?</h5>
-            <p className="text-gray-400 leading-relaxed mb-4">
-              Call our central brokerage concierge hotline for expedited physical site tours.
-            </p>
-            <div className="flex items-center space-x-2 text-[#E53935] font-bold text-sm">
-              <Phone className="w-4 h-4" />
-              <span>+91 (0124) 480-9900</span>
-            </div>
-          </div>
         </div>
+
+        {/* 5. Related Properties Section */}
+        {relatedProperties && relatedProperties.length > 0 && (
+          <section className="pt-10 border-t border-[#EBEBEB] space-y-4">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-[#222222] tracking-tight">
+              Similar Verified Properties in {property.locality || property.city}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {relatedProperties.map((relProp) => (
+                <PropertyCard key={relProp._id} property={relProp} />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
 
-      {/* Enquiry Modal */}
+      {/* Schedule Visit Modal */}
+      <Modal
+        isOpen={visitModalOpen}
+        onClose={() => setVisitModalOpen(false)}
+        title="Schedule Property Visit"
+      >
+        {visitSuccess ? (
+          <div className="text-center py-6 space-y-3">
+            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+              <Check className="w-6 h-6" />
+            </div>
+            <h4 className="font-extrabold text-base text-[#222222]">Visit Request Confirmed!</h4>
+            <p className="text-xs text-[#717171]">
+              Assigned broker {broker?.name || 'Redstone Team'} will coordinate with the owner and confirm your time slot.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleVisitSubmit} className="space-y-4 text-xs">
+            <div className="p-3 bg-[#F7F7F7] rounded-xl text-xs font-semibold text-[#222222]">
+              Property: <strong>{property.title}</strong>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-[#717171] mb-1">Visit Date</label>
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={visitDate}
+                  onChange={(e) => setVisitDate(e.target.value)}
+                  required
+                  className="w-full p-2.5 rounded-xl border border-[#EBEBEB] bg-[#F7F7F7] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#717171] mb-1">Time Slot</label>
+                <select
+                  value={visitTime}
+                  onChange={(e) => setVisitTime(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-[#EBEBEB] bg-[#F7F7F7] focus:outline-none"
+                >
+                  <option value="10:00 AM">10:00 AM</option>
+                  <option value="11:30 AM">11:30 AM</option>
+                  <option value="02:00 PM">02:00 PM</option>
+                  <option value="04:00 PM">04:00 PM</option>
+                  <option value="05:30 PM">05:30 PM</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[#717171] mb-1">Special Notes</label>
+              <textarea
+                rows="3"
+                placeholder="e.g. Bringing family members, parking required..."
+                value={visitNotes}
+                onChange={(e) => setVisitNotes(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-[#EBEBEB] bg-[#F7F7F7] focus:outline-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={visitSubmitting}
+              className="w-full py-3 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl font-bold text-xs shadow-md transition"
+            >
+              {visitSubmitting ? 'Submitting Request...' : 'Confirm Visit Booking'}
+            </button>
+          </form>
+        )}
+      </Modal>
+
+      {/* Direct Enquiry Modal */}
       <Modal
         isOpen={enquiryModalOpen}
         onClose={() => setEnquiryModalOpen(false)}
         title="Send Enquiry to Assigned Broker"
       >
         {enquirySuccess ? (
-          <div className="text-center py-8 space-y-3">
+          <div className="text-center py-6 space-y-3">
             <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle className="w-6 h-6" />
+              <Check className="w-6 h-6" />
             </div>
-            <h4 className="text-lg font-bold text-[#222222]">Enquiry Submitted Successfully!</h4>
-            <p className="text-xs text-gray-500">
-              The assigned broker and property owner have been notified. Our broker will connect with you shortly.
+            <h4 className="font-extrabold text-base text-[#222222]">Enquiry Dispatched!</h4>
+            <p className="text-xs text-[#717171]">
+              Our in-house broker will review your budget and reply directly via phone or dashboard.
             </p>
           </div>
         ) : (
-          <form onSubmit={handleEnquirySubmit} className="space-y-4">
-            <div className="p-3 bg-red-50 rounded-xl text-xs text-[#C62828] font-medium">
-              Property: <strong>{property.title}</strong>
-            </div>
-
+          <form onSubmit={handleEnquirySubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Your Message</label>
+              <label className="block text-[11px] font-bold text-[#717171] mb-1">Your Message</label>
               <textarea
                 rows="4"
                 value={enquiryMessage}
                 onChange={(e) => setEnquiryMessage(e.target.value)}
                 required
-                className="w-full p-3 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none focus:border-[#C62828]"
+                className="w-full p-2.5 rounded-xl border border-[#EBEBEB] bg-[#F7F7F7] focus:outline-none"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Preferred Call Time</label>
+                <label className="block text-[11px] font-bold text-[#717171] mb-1">Preferred Time</label>
                 <select
                   value={preferredTime}
                   onChange={(e) => setPreferredTime(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none"
+                  className="w-full p-2.5 rounded-xl border border-[#EBEBEB] bg-[#F7F7F7] focus:outline-none"
                 >
                   <option value="Anytime">Anytime</option>
                   <option value="Morning (9 AM - 12 PM)">Morning (9 AM - 12 PM)</option>
                   <option value="Afternoon (12 PM - 4 PM)">Afternoon (12 PM - 4 PM)</option>
                   <option value="Evening (4 PM - 8 PM)">Evening (4 PM - 8 PM)</option>
-                  <option value="Weekends Only">Weekends Only</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Your Target Budget (₹)</label>
+                <label className="block text-[11px] font-bold text-[#717171] mb-1">Your Target Budget (₹)</label>
                 <input
                   type="number"
                   value={clientBudget}
                   onChange={(e) => setClientBudget(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none"
+                  className="w-full p-2.5 rounded-xl border border-[#EBEBEB] bg-[#F7F7F7] focus:outline-none"
                 />
               </div>
             </div>
@@ -757,79 +837,70 @@ const PropertyDetailPage = () => {
         )}
       </Modal>
 
-      {/* Schedule Visit Modal */}
-      <Modal
-        isOpen={visitModalOpen}
-        onClose={() => setVisitModalOpen(false)}
-        title="Schedule Property Visit"
-      >
-        {visitSuccess ? (
-          <div className="text-center py-8 space-y-3">
-            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle className="w-6 h-6" />
-            </div>
-            <h4 className="text-lg font-bold text-[#222222]">Visit Scheduled Successfully!</h4>
-            <p className="text-xs text-gray-500">
-              The property owner has received an automatic notification to confirm availability. Your broker will escort you.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleVisitSubmit} className="space-y-4">
-            <div className="p-3 bg-red-50 rounded-xl text-xs text-[#C62828] font-medium">
-              Scheduling physical visit for: <strong>{property.title}</strong>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Visit Date</label>
-                <input
-                  type="date"
-                  min={new Date().toISOString().split('T')[0]}
-                  value={visitDate}
-                  onChange={(e) => setVisitDate(e.target.value)}
-                  required
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Preferred Time Slot</label>
-                <select
-                  value={visitTime}
-                  onChange={(e) => setVisitTime(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none"
-                >
-                  <option value="10:00 AM">10:00 AM</option>
-                  <option value="11:30 AM">11:30 AM</option>
-                  <option value="02:00 PM">02:00 PM</option>
-                  <option value="03:30 PM">03:30 PM</option>
-                  <option value="05:00 PM">05:00 PM</option>
-                  <option value="06:30 PM">06:30 PM</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Special Requirements / Notes (Optional)</label>
-              <textarea
-                rows="3"
-                placeholder="e.g. Bringing family architect, require parking for 2 cars..."
-                value={visitNotes}
-                onChange={(e) => setVisitNotes(e.target.value)}
-                className="w-full p-3 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none"
-              />
-            </div>
-
+      {/* Full Photo Gallery Modal */}
+      {galleryModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col justify-between p-4 sm:p-6 animate-fade-in text-white">
+          <div className="flex items-center justify-between pb-4">
+            <span className="text-xs font-bold text-gray-400">
+              {activeImageIndex + 1} of {images.length} Photos
+            </span>
             <button
-              type="submit"
-              disabled={visitSubmitting}
-              className="w-full py-3 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl font-bold text-xs shadow-md transition"
+              type="button"
+              onClick={() => setGalleryModalOpen(false)}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition text-white"
             >
-              {visitSubmitting ? 'Confirming with Owner & Broker...' : 'Request Visit Confirmation'}
+              Close ✕
             </button>
-          </form>
-        )}
-      </Modal>
+          </div>
+
+          <div className="relative flex-1 flex items-center justify-center max-w-5xl mx-auto w-full overflow-hidden">
+            <img
+              src={images[activeImageIndex]?.url}
+              alt=""
+              className="max-h-[75vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl"
+            />
+
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1))
+                  }
+                  className="absolute left-2 p-3 rounded-full bg-black/60 hover:bg-black/90 text-white transition"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1))
+                  }
+                  className="absolute right-2 p-3 rounded-full bg-black/60 hover:bg-black/90 text-white transition"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Bottom Thumbnails Strip */}
+          <div className="flex items-center justify-center space-x-2 overflow-x-auto py-2">
+            {images.map((img, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setActiveImageIndex(idx)}
+                className={`w-14 h-10 rounded-lg overflow-hidden border-2 transition shrink-0 ${
+                  activeImageIndex === idx ? 'border-[#C62828] scale-105' : 'border-transparent opacity-60'
+                }`}
+              >
+                <img src={img.url} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import Navbar from '../common/Navbar';
 import Footer from '../common/Footer';
+import ErrorBoundary from '../common/ErrorBoundary';
 import { useAuth } from '../../context/AuthContext';
 
 const PublicLayout = () => {
@@ -28,7 +29,9 @@ const PublicLayout = () => {
     <div className="min-h-screen flex flex-col bg-[#F8F8F8]">
       <Navbar />
       <main className="flex-1">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>

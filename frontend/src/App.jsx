@@ -199,12 +199,12 @@ function App() {
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
-            </ErrorBoundary>
 
               {/* Floating Compare Pill & Modal */}
               <FloatingCompareBar />
               <PropertyCompareModal />
-            </CompareProvider>
+            </ErrorBoundary>
+          </CompareProvider>
           </SocketProvider>
         </AuthProvider>
       </LanguageProvider>
